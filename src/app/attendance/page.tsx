@@ -7,6 +7,7 @@ import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc } from 
 import { Upload, AlertCircle, CheckCircle2, Clock, Loader2, X, UserCheck } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
+import { candidates } from "@/lib/mock-data";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -134,7 +135,7 @@ export default function AttendancePage() {
       const students = snap.docs.map(d => ({ id: d.id, name: d.data().name, present: true }));
       
       if (students.length === 0) {
-        const mockStuds = candidates.filter(c => c.batch === selectedBatch).map(c => ({ id: c.id, name: c.name, present: true }));
+        const mockStuds = candidates.filter(c => c.batchName === selectedBatch).map(c => ({ id: c.id, name: c.name, present: true }));
         setManualStudents(mockStuds);
       } else {
         setManualStudents(students);

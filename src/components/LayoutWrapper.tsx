@@ -18,6 +18,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   // Route protection mapping
   const routePermissions: Record<string, string[]> = {
+    "/users": ["Admin"],
     "/audit": ["Admin"],
     "/reports": ["Admin", "Training Coordinator"],
     "/analytics": ["Admin", "Training Coordinator"],

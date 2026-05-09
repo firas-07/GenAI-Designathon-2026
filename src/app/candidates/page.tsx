@@ -94,7 +94,7 @@ export default function CandidatesPage() {
       const lines = text.split("\n").slice(1); // Skip header
       
       let count = 0;
-      const newCands = [];
+      const newCands: any[] = [];
 
       for (const line of lines) {
         const [name, email, batch] = line.split(",").map(s => s.trim());

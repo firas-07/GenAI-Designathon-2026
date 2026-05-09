@@ -4,7 +4,7 @@ import {
   onAuthStateChanged, 
   User as FirebaseUser 
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export type UserRole = "Admin" | "Training Coordinator" | "Trainer";
@@ -49,7 +49,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (userDoc.exists()) {
             setProfile(userDoc.data() as UserProfile);
           } else {
-            setProfile(null);
+            // Check for pending invitations if profile doesn't exist
+            if (user.email) {
+              const invRef = doc(db, "invitations", user.email.toLowerCase());
+              const invDoc = await getDoc(invRef);
+              
+              if (invDoc.exists()) {
+                const invData = invDoc.data();
+                // Create profile automatically from invitation
+                const newProfile: UserProfile = {
+                  uid: user.uid,
+                  email: user.email,
+                  role: invData.role,
+                  name: user.displayName || user.email.split('@')[0], // Default name
+                };
+                
+                await setDoc(doc(db, "users", user.uid), newProfile);
+                
+                // Update invitation status (optional: delete or mark accepted)
+                await updateDoc(invRef, { status: "accepted", acceptedAt: new Date().toISOString() });
+                
+                setProfile(newProfile);
+              } else {
+                setProfile(null);
+              }
+            } else {
+              setProfile(null);
+            }
           }
         } catch (err) {
           console.error("Error fetching user profile:", err);
