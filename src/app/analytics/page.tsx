@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from "recharts";
 
-const COLORS = ["#14b8a6", "#10b981", "#f59e0b", "#ef4444", "#2dd4bf"];
+const COLORS = ["#3B82F6", "#10b981", "#f59e0b", "#ef4444", "#60A5FA"];
 
 export default function AnalyticsPage() {
   const [liveCands, setLiveCands] = useState<any[]>([]);
@@ -55,14 +55,14 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {[
             { label: "Placement Rate", value: `${placementRate}%`, sub: `${offered} candidates placed`, color: "#10b981" },
-            { label: "Avg Talent Score", value: `${avgScore}%`, sub: "Global aggregate", color: "#14b8a6" },
+            { label: "Avg Talent Score", value: `${avgScore}%`, sub: "Global aggregate", color: "#3B82F6" },
             { label: "Dropout Risk", value: `${riskRate}%`, sub: `${highRisk} candidates flagged`, color: "#ef4444" },
             { label: "Total Batches", value: liveBatches.length, sub: "Active tracking", color: "#f59e0b" },
           ].map(k => (
             <div key={k.label} className="glass-card p-5 metric-card">
               <p className="text-2xl font-bold mb-1" style={{ color: k.color }}>{k.value}</p>
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">{k.label}</p>
-              <p className="text-[10px] mt-1 font-medium" style={{ color: "#52525b" }}>{k.sub}</p>
+              <p className="text-[10px] mt-1 font-medium" style={{ color: "#5271A3" }}>{k.sub}</p>
             </div>
           ))}
         </div>
@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
                     <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" paddingAngle={5}>
                       {statusData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ background: "#09090b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }} />
+                    <Tooltip contentStyle={{ background: "#040914", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }} />
                     <Legend verticalAlign="bottom" height={36}/>
                   </PieChart>
                 </ResponsiveContainer>

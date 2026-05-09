@@ -252,14 +252,14 @@ export default function AttendancePage() {
           </div>
           <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
             <div className="flex-1 flex items-center gap-4">
-              <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="bg-[#18181b]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500 min-w-[200px]">
+              <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500 min-w-[200px]">
                 {liveBatches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
               </select>
-              <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="bg-[#18181b]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500" />
+              <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500" />
             </div>
             <div className="flex gap-3">
               <input type="file" id="attnUpload" hidden accept=".csv" onChange={handleFileUpload} />
-              <button onClick={() => document.getElementById('attnUpload')?.click()} disabled={isSaving} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg shadow-black/20 transition-all hover:scale-[1.02]" style={{ background: "#14b8a6" }}>
+              <button onClick={() => document.getElementById('attnUpload')?.click()} disabled={isSaving} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg shadow-black/20 transition-all hover:scale-[1.02]" style={{ background: "#3B82F6" }}>
                 {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Upload CSV
               </button>
               <button 
@@ -327,21 +327,21 @@ export default function AttendancePage() {
 
         <div className="glass-card p-6">
           <p className="text-base font-bold text-white mb-1">Attendance Trend (Last 8 Days)</p>
-          <p className="text-xs mb-5" style={{ color: "#52525b" }}>{selectedBatch || "All Batches"} — Last 8 logged sessions</p>
+          <p className="text-xs mb-5" style={{ color: "#5271A3" }}>{selectedBatch || "All Batches"} — Last 8 logged sessions</p>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={liveAttendanceTrend.length > 0 ? liveAttendanceTrend : []}>
               <defs>
                 <linearGradient id="attGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(20, 184, 166,0.1)" />
-              <XAxis dataKey="date" tick={{ fill: "#52525b", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#52525b", fontSize: 11 }} domain={[70, 100]} />
+              <XAxis dataKey="date" tick={{ fill: "#5271A3", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#5271A3", fontSize: 11 }} domain={[70, 100]} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="percentage" stroke="#14b8a6" strokeWidth={2.5}
-                fill="url(#attGrad)" name="percentage" dot={{ r: 4, fill: "#14b8a6", strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="percentage" stroke="#3B82F6" strokeWidth={2.5}
+                fill="url(#attGrad)" name="percentage" dot={{ r: 4, fill: "#3B82F6", strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

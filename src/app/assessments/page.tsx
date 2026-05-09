@@ -103,8 +103,8 @@ export default function AssessmentsPage() {
       <div className="p-8 space-y-6 fade-in">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Avg Coding", value: `${avgCoding}%`, color: "#14b8a6" },
-            { label: "Avg API", value: `${avgApi}%`, color: "#2dd4bf" },
+            { label: "Avg Coding", value: `${avgCoding}%`, color: "#3B82F6" },
+            { label: "Avg API", value: `${avgApi}%`, color: "#60A5FA" },
             { label: "Avg Project", value: `${avgProject}%`, color: "#10b981" },
             { label: "Avg Overall", value: `${avgOverall}%`, color: "#f59e0b" },
           ].map(s => (
@@ -130,7 +130,7 @@ export default function AssessmentsPage() {
               <input type="text" value={weekModule} onChange={e => setWeekModule(e.target.value)} placeholder="Week / Module" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none" />
               <input type="file" id="scoreUpload" hidden accept=".csv" onChange={handleFileUpload} />
               <button onClick={() => document.getElementById('scoreUpload')?.click()} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all"
-                style={{ background: "#14b8a6" }}>
+                style={{ background: "#3B82F6" }}>
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Upload CSV
               </button>
             </div>
@@ -145,9 +145,9 @@ export default function AssessmentsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="rgba(255,255,255,0.08)" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: "#71717a", fontSize: 11 }} />
-                  <Radar dataKey="value" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.25} />
-                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid rgba(20, 184, 166,0.3)", borderRadius: 8, color: "#fff" }} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: "#82A0CE", fontSize: 11 }} />
+                  <Radar dataKey="value" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.25} />
+                  <Tooltip contentStyle={{ background: "#0B1221", border: "1px solid rgba(20, 184, 166,0.3)", borderRadius: 8, color: "#fff" }} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>

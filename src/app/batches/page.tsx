@@ -117,7 +117,7 @@ export default function BatchesPage() {
       {selectedBatch && (
         <div className="fixed inset-0 z-[10000] flex justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedBatch(null)} />
-          <div className="relative w-full max-w-xl bg-[#09090b] border-l border-white/[0.08] shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="relative w-full max-w-xl bg-[#040914] border-l border-white/[0.08] shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-8 border-b border-zinc-800 flex items-center justify-between bg-gradient-to-r from-teal-500/10 to-transparent">
               <div>
                 <h2 className="text-2xl font-bold text-white">{selectedBatch.name}</h2>
@@ -253,10 +253,10 @@ export default function BatchesPage() {
               placeholder="Search batches..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[#18181b]/50 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white outline-none focus:border-teal-500/50 transition-all"
+              className="w-full bg-[#0B1221]/50 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white outline-none focus:border-teal-500/50 transition-all"
             />
           </div>
-          <div className="flex items-center gap-2 bg-[#18181b]/50 p-1 rounded-xl border border-white/[0.06]">
+          <div className="flex items-center gap-2 bg-[#0B1221]/50 p-1 rounded-xl border border-white/[0.06]">
             {["All", "Running", "Planned", "Completed", "Closed"].map((s) => (
               <button
                 key={s}
@@ -268,22 +268,22 @@ export default function BatchesPage() {
             ))}
           </div>
           <button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
-            style={{ background: "#14b8a6" }}>
+            style={{ background: "#3B82F6" }}>
             <Plus size={18} /> Create Batch
           </button>
         </div>
         {/* Stats Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total", value: displayBatches.length, color: "#14b8a6" },
+            { label: "Total", value: displayBatches.length, color: "#3B82F6" },
             { label: "Running", value: displayBatches.filter(b => b.status === "Running").length, color: "#10b981" },
             { label: "Planned", value: displayBatches.filter(b => b.status === "Planned").length, color: "#3b82f6" },
-            { label: "Completed", value: displayBatches.filter(b => ["Completed","Closed"].includes(b.status)).length, color: "#2dd4bf" },
+            { label: "Completed", value: displayBatches.filter(b => ["Completed","Closed"].includes(b.status)).length, color: "#60A5FA" },
           ].map(c => (
             <div key={c.label} className="glass-card p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"
                 style={{ background: `${c.color}22`, color: c.color }}>{c.value}</div>
-              <p className="text-sm font-medium" style={{ color: "#71717a" }}>{c.label} Batches</p>
+              <p className="text-sm font-medium" style={{ color: "#82A0CE" }}>{c.label} Batches</p>
             </div>
           ))}
         </div>
@@ -296,36 +296,36 @@ export default function BatchesPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <p className="text-base font-bold text-white">{b.name}</p>
-                  <p className="text-xs mt-1" style={{ color: "#52525b" }}>ID: {b.batchId || b.id} · {b.coordinator}</p>
+                  <p className="text-xs mt-1" style={{ color: "#5271A3" }}>ID: {b.batchId || b.id} · {b.coordinator}</p>
                 </div>
                 <span className={`${statusBadge(b.status as BatchStatus)} px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0`}>{b.status}</span>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
-                  <p className="text-lg font-bold" style={{ color: (b.avgAttendance || 0) < 70 && (b.avgAttendance || 0) > 0 ? "#ef4444" : (b.avgAttendance || 0) === 0 ? "#3f3f46" : (b.avgAttendance || 0) < 80 ? "#f59e0b" : "#22c55e" }}>
+                  <p className="text-lg font-bold" style={{ color: (b.avgAttendance || 0) < 70 && (b.avgAttendance || 0) > 0 ? "#ef4444" : (b.avgAttendance || 0) === 0 ? "#334B76" : (b.avgAttendance || 0) < 80 ? "#f59e0b" : "#22c55e" }}>
                     {b.avgAttendance || 0}%
                   </p>
-                  <p className="text-xs" style={{ color: "#52525b" }}>Attendance</p>
+                  <p className="text-xs" style={{ color: "#5271A3" }}>Attendance</p>
                 </div>
                 <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
-                  <p className="text-lg font-bold" style={{ color: (b.avgScore || 0) === 0 ? "#3f3f46" : (b.avgScore || 0) < 60 ? "#ef4444" : "#14b8a6" }}>
+                  <p className="text-lg font-bold" style={{ color: (b.avgScore || 0) === 0 ? "#334B76" : (b.avgScore || 0) < 60 ? "#ef4444" : "#3B82F6" }}>
                     {b.avgScore || 0}%
                   </p>
-                  <p className="text-xs" style={{ color: "#52525b" }}>Avg Score</p>
+                  <p className="text-xs" style={{ color: "#5271A3" }}>Avg Score</p>
                 </div>
                 <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
                   <p className="text-lg font-bold text-white">{b.enrolled || 0}/{b.capacity || 0}</p>
-                  <p className="text-xs" style={{ color: "#52525b" }}>Enrolled</p>
+                  <p className="text-xs" style={{ color: "#5271A3" }}>Enrolled</p>
                 </div>
               </div>
               <div className="mb-auto">
                 <div className="mb-4">
-                  <div className="flex justify-between text-xs mb-1" style={{ color: "#52525b" }}>
+                  <div className="flex justify-between text-xs mb-1" style={{ color: "#5271A3" }}>
                     <span>Capacity fill</span><span>{b.capacity > 0 ? Math.round((b.enrolled || 0) / b.capacity * 100) : 0}%</span>
                   </div>
                   <div className="progress-bar"><div className="progress-fill" style={{ width: `${b.capacity > 0 ? ((b.enrolled || 0) / b.capacity) * 100 : 0}%` }} /></div>
                 </div>
-                <div className="flex flex-col sm:flex-row justify-between gap-2 text-xs" style={{ color: "#52525b" }}>
+                <div className="flex flex-col sm:flex-row justify-between gap-2 text-xs" style={{ color: "#5271A3" }}>
                   <span>Trainer: {b.trainer}</span>
                   <span className="font-medium text-teal-400">{b.startDate} → {b.endDate}</span>
                 </div>

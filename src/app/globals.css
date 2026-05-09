@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────
-   MAVERICK — Minimalist Design System
-   Inspired by: Perplexity AI, Linear, Vercel
-   Palette: Zinc + Teal accent
+   MAVERICK — Deep Blue Neon Theme
+   Inspired by: Dark Modern Dashboards
+   Palette: Deep Blue + Neon Blue accent
 ───────────────────────────────────────── */
 
 @theme {
-  /* Zinc neutrals — Perplexity palette */
-  --color-zinc-950: #09090b;
-  --color-zinc-900: #18181b;
-  --color-zinc-800: #27272a;
-  --color-zinc-700: #3f3f46;
-  --color-zinc-600: #52525b;
-  --color-zinc-500: #71717a;
-  --color-zinc-400: #a1a1aa;
-  --color-zinc-300: #d4d4d8;
-  --color-zinc-200: #e4e4e7;
-  --color-zinc-100: #f4f4f5;
-  --color-zinc-50:  #fafafa;
+  /* Blue neutrals */
+  --color-zinc-950: #040914;
+  --color-zinc-900: #0B1221;
+  --color-zinc-800: #131E38;
+  --color-zinc-700: #1E2E50;
+  --color-zinc-600: #334B76;
+  --color-zinc-500: #5271A3;
+  --color-zinc-400: #82A0CE;
+  --color-zinc-300: #B4C6E4;
+  --color-zinc-200: #D8E3F5;
+  --color-zinc-100: #F1F5FD;
+  --color-zinc-50:  #F8FAFF;
 
-  /* Single accent — clean teal */
-  --color-accent:        #14b8a6;
-  --color-accent-dim:    rgba(20, 184, 166, 0.12);
-  --color-accent-border: rgba(20, 184, 166, 0.25);
+  /* Single accent — Neon Blue */
+  --color-accent:        #3B82F6;
+  --color-accent-dim:    rgba(59, 130, 246, 0.12);
+  --color-accent-border: rgba(59, 130, 246, 0.25);
 
   /* Semantic */
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger:  #ef4444;
-  --color-info:    #3b82f6;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger:  #EF4444;
+  --color-info:    #3B82F6;
 }
 
 /* ─── Reset ─── */
@@ -37,8 +37,8 @@
 
 html, body {
   margin: 0;
-  background: #09090b;
-  color: #fafafa;
+  background: #040914;
+  color: #F8FAFF;
   font-family: var(--font-geist), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
@@ -48,16 +48,16 @@ html, body {
 /* ─── Scrollbar ─── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #52525b; }
-.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+::-webkit-scrollbar-thumb { background: #334B76; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #5271A3; }
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: #334B76 transparent; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
 /* ─── Glass Card — Perplexity style ─── */
 /* Clean, borderless panels with razor-thin separator */
 .glass-card {
-  background: #18181b;
+  background: #0B1221;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
 }
@@ -79,13 +79,13 @@ html, body {
 /* Minimal pill style — no glows */
 .badge-running     { background: rgba(34,197,94,0.1);  color: #4ade80; border: 1px solid rgba(34,197,94,0.2);  border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-planned     { background: rgba(59,130,246,0.1); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.badge-completed   { background: rgba(20,184,166,0.1); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.badge-closed      { background: rgba(113,113,122,0.1);color: #71717a; border: 1px solid rgba(113,113,122,0.2);border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.badge-completed   { background: rgba(20,184,166,0.1); color: #60A5FA; border: 1px solid rgba(20,184,166,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.badge-closed      { background: rgba(113,113,122,0.1);color: #82A0CE; border: 1px solid rgba(113,113,122,0.2);border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-active      { background: rgba(34,197,94,0.1);  color: #4ade80; border: 1px solid rgba(34,197,94,0.2);  border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-high        { background: rgba(239,68,68,0.1);  color: #f87171; border: 1px solid rgba(239,68,68,0.2);  border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-medium      { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-low         { background: rgba(34,197,94,0.1);  color: #4ade80; border: 1px solid rgba(34,197,94,0.2);  border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.badge-offered     { background: rgba(20,184,166,0.1); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.badge-offered     { background: rgba(20,184,166,0.1); color: #60A5FA; border: 1px solid rgba(20,184,166,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-discontinued{ background: rgba(239,68,68,0.08); color: #f87171; border: 1px solid rgba(239,68,68,0.15); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .badge-not-cleared { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 
@@ -94,12 +94,12 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: #71717a;
-  transition: color 0.15s ease, background 0.15s ease;
+  color: #82A0CE;
+  transition: all 0.2s ease;
   cursor: pointer;
   text-decoration: none;
   letter-spacing: -0.01em;
@@ -109,10 +109,9 @@ html, body {
   color: #e4e4e7;
 }
 .nav-item.active {
-  background: rgba(20, 184, 166, 0.08);
-  color: #2dd4bf;
-  border-left: 2px solid #14b8a6;
-  padding-left: 8px;
+  background: #2563EB;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 /* ─── Metric Card ─── */
@@ -128,12 +127,12 @@ html, body {
 
 /* ─── AI Chat Bubbles ─── */
 .chat-bubble-ai {
-  background: #1c1c1f;
+  background: #131E38;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 4px 12px 12px 12px;
 }
 .chat-bubble-user {
-  background: #14b8a6;
+  background: #3B82F6;
   color: #fff;
   border-radius: 12px 4px 12px 12px;
 }
@@ -148,7 +147,7 @@ html, body {
 .progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: #14b8a6;
+  background: #3B82F6;
   transition: width 0.6s ease;
 }
 

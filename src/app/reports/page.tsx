@@ -19,7 +19,7 @@ const reportCategories = [
     id: "assessments", 
     title: "Assessment Scores", 
     icon: FileSpreadsheet, 
-    color: "#14b8a6",
+    color: "#3B82F6",
     description: "All assessment tracks: Sprint Reviews, API, Coding, and Projects.",
     reports: ["Sprint Assessment Scorecard", "Consolidated Score Sheet", "Component-wise Performance"]
   },
@@ -35,7 +35,7 @@ const reportCategories = [
     id: "summary", 
     title: "Consolidated Batch", 
     icon: FileDown, 
-    color: "#2dd4bf",
+    color: "#60A5FA",
     description: "High-level summary of candidate status transitions and offers.",
     reports: ["Discontinued Candidate List", "Offered / Onboarded Report", "Full Batch Lifecycle Summary"]
   },

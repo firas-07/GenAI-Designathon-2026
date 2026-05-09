@@ -2,9 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Users, BookOpen, ClipboardCheck,
-  MessageSquare, BarChart3, FileDown, Bell, Shield,
-  Bot, Layers, Menu, X, ChevronLeft, ChevronRight, LogOut
+  LayoutDashboard, Users, Settings, BarChart3, Shield, FolderSearch, Bell, Bot,
+  Layers, ClipboardCheck, BookOpen, MessageSquare, FileDown, Menu, X, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -13,17 +12,35 @@ import { signOut } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { href: "/",            label: "Dashboard",        icon: LayoutDashboard, roles: ["Admin", "Training Coordinator", "Trainer"] },
-  { href: "/batches",     label: "Batch Management", icon: Layers,          roles: ["Admin", "Training Coordinator", "Trainer"] },
-  { href: "/candidates",  label: "Candidates",       icon: Users,           roles: ["Admin", "Training Coordinator"] },
-  { href: "/attendance",  label: "Attendance",       icon: ClipboardCheck,  roles: ["Admin", "Training Coordinator", "Trainer"] },
-  { href: "/assessments", label: "Assessments",      icon: BookOpen,        roles: ["Admin", "Trainer"] },
-  { href: "/feedback",    label: "Feedback",         icon: MessageSquare,   roles: ["Admin", "Training Coordinator"] },
-  { href: "/analytics",   label: "Analytics",        icon: BarChart3,       roles: ["Admin", "Training Coordinator"] },
-  { href: "/reports",     label: "Reports",          icon: FileDown,        roles: ["Admin", "Training Coordinator"] },
-  { href: "/alerts",      label: "Alerts",           icon: Bell,            roles: ["Admin", "Training Coordinator"] },
-  { href: "/audit",       label: "Audit Log",        icon: Shield,          roles: ["Admin"] },
-  { href: "/ai-assistant",label: "AI Assistant",     icon: Bot,             roles: ["Admin", "Training Coordinator"] },
+  // Shared
+  { href: "/",                 label: "Dashboard",            icon: LayoutDashboard, roles: ["Admin", "Training Coordinator", "Trainer"] },
+  
+  // Admin specific
+  { href: "/users",            label: "User Management",      icon: Users,           roles: ["Admin"] },
+  { href: "/settings",         label: "System Settings",      icon: Settings,        roles: ["Admin"] },
+  { href: "/analytics",        label: "Analytics",            icon: BarChart3,       roles: ["Admin"] },
+  { href: "/audit",            label: "Audit Logs",           icon: Shield,          roles: ["Admin"] },
+  { href: "/files",            label: "File Monitoring",      icon: FolderSearch,    roles: ["Admin"] },
+  { href: "/admin-alerts",     label: "Alerts Configuration", icon: Bell,            roles: ["Admin"] },
+  { href: "/ai-assistant",     label: "AI Insights",          icon: Bot,             roles: ["Admin"] },
+
+  // Training Coordinator specific
+  { href: "/batches",          label: "Batch Management",     icon: Layers,          roles: ["Training Coordinator"] },
+  { href: "/candidates",       label: "Candidates",           icon: Users,           roles: ["Training Coordinator"] },
+  { href: "/attendance",       label: "Attendance Monitor",   icon: ClipboardCheck,  roles: ["Training Coordinator"] },
+  { href: "/assessments",      label: "Assessments",          icon: BookOpen,        roles: ["Training Coordinator"] },
+  { href: "/feedback",         label: "Feedback",             icon: MessageSquare,   roles: ["Training Coordinator"] },
+  { href: "/reports",          label: "Reports",              icon: FileDown,        roles: ["Training Coordinator"] },
+  { href: "/alerts",           label: "Alerts",               icon: Bell,            roles: ["Training Coordinator"] },
+  { href: "/ai-assistant",     label: "AI Assistant",         icon: Bot,             roles: ["Training Coordinator"] },
+
+  // Trainer specific
+  { href: "/batches",          label: "My Batches",           icon: Layers,          roles: ["Trainer"] },
+  { href: "/attendance",       label: "Attendance Upload",    icon: ClipboardCheck,  roles: ["Trainer"] },
+  { href: "/assessments",      label: "Assessment Upload",    icon: BookOpen,        roles: ["Trainer"] },
+  { href: "/files",            label: "Uploads / Documents",  icon: FolderSearch,    roles: ["Trainer"] },
+  { href: "/analytics",        label: "Performance View",     icon: BarChart3,       roles: ["Trainer"] },
+  { href: "/ai-assistant",     label: "AI Assistant",         icon: Bot,             roles: ["Trainer"] },
 ];
 
 interface SidebarProps {
@@ -69,35 +86,29 @@ export default function Sidebar({ mobileOpen, setMobileOpen, collapsed, setColla
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="hidden lg:flex absolute -right-3 top-[72px] w-6 h-6 rounded-full items-center justify-center z-[80] transition-colors"
-          style={{ background: "#27272a", border: "1px solid rgba(255,255,255,0.08)", color: "#71717a" }}
+          style={{ background: "#1E2E50", border: "1px solid rgba(255,255,255,0.08)", color: "#82A0CE" }}
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
 
         {/* Logo */}
         <div className={cn(
-          "flex items-center gap-3 border-b border-white/[0.06] overflow-hidden",
-          collapsed ? "px-4 py-5 justify-center" : "px-5 py-5"
+          "flex items-center justify-center border-b border-white/[0.06] overflow-hidden",
+          "py-6"
         )}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: "#14b8a6" }}>
-            <Layers size={14} className="text-white" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "#2563EB" }}>
+            <LayoutDashboard size={20} className="text-white" />
           </div>
-          {!collapsed && (
-            <div>
-              <p className="font-semibold text-[13px] text-white leading-none tracking-tight">Maverick</p>
-              <p className="text-[10px] mt-0.5 tracking-widest uppercase font-medium" style={{ color: "#52525b" }}>Platform</p>
-            </div>
-          )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-0.5 custom-scrollbar">
-          {filteredNavItems.map(({ href, label, icon: Icon }) => {
+          {filteredNavItems.map(({ href, label, icon: Icon }, index) => {
             const active = pathname === href;
             return (
               <Link
-                key={href}
+                key={`${href}-${label}-${index}`}
                 href={href}
                 title={collapsed ? label : ""}
                 className={cn("nav-item", active && "active", collapsed && "justify-center px-0")}
@@ -108,7 +119,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen, collapsed, setColla
                 {/* Tooltip on collapse */}
                 {collapsed && (
                   <div className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-[100]"
-                    style={{ background: "#27272a", color: "#e4e4e7", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    style={{ background: "#1E2E50", color: "#e4e4e7", border: "1px solid rgba(255,255,255,0.08)" }}>
                     {label}
                   </div>
                 )}
@@ -117,42 +128,19 @@ export default function Sidebar({ mobileOpen, setMobileOpen, collapsed, setColla
           })}
         </nav>
 
-        {/* User section */}
-        <div className={cn("px-2 pb-4 pt-2 border-t border-white/[0.06]", collapsed && "flex flex-col items-center")}>
-          {!collapsed && profile && (
-            <div className="flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg"
-              style={{ background: "rgba(255,255,255,0.03)" }}>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                style={{ background: "#14b8a6" }}>
-                {initials(profile.name)}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-[12px] font-semibold text-white truncate leading-tight">{profile.name}</p>
-                <p className="text-[9px] tracking-widest uppercase font-medium truncate" style={{ color: "#52525b" }}>{profile.role}</p>
-              </div>
+        {/* User section removed as requested */}
+
+        {/* System Status block matching the image */}
+        {!collapsed && (
+          <div className="mx-4 mb-4 mt-auto p-4 rounded-xl border border-white/[0.04]" style={{ background: "rgba(11, 18, 33, 0.5)" }}>
+            <p className="text-[11px] font-semibold text-white mb-2 tracking-wide">System Status</p>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-[#10b981]" />
+              <p className="text-[10px] text-[#10b981] font-medium">All Systems Operational</p>
             </div>
-          )}
-          {collapsed && profile && (
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white mb-2 flex-shrink-0"
-              style={{ background: "#14b8a6" }}>
-              {initials(profile.name)}
-            </div>
-          )}
-          <button
-            onClick={handleLogout}
-            className={cn(
-              "flex items-center gap-2.5 px-2 py-2 rounded-lg text-[12px] font-medium transition-colors w-full",
-              collapsed && "justify-center"
-            )}
-            style={{ color: "#52525b" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#f87171"; (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.06)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#52525b"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            title="Sign Out"
-          >
-            <LogOut size={14} />
-            {!collapsed && <span>Sign out</span>}
-          </button>
-        </div>
+            <p className="text-[10px] text-[#5271A3]">v1.0.0</p>
+          </div>
+        )}
       </aside>
     </>
   );

@@ -12,11 +12,11 @@ const severityConfig = {
 };
 
 const typeConfig = {
-  attendance: { label: "Attendance", color: "#14b8a6" },
+  attendance: { label: "Attendance", color: "#3B82F6" },
   risk: { label: "Risk", color: "#ef4444" },
   assessment: { label: "Assessment", color: "#f59e0b" },
   feedback: { label: "Feedback", color: "#10b981" },
-  system: { label: "System", color: "#2dd4bf" },
+  system: { label: "System", color: "#60A5FA" },
 };
 
 export default function AlertsPage() {

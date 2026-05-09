@@ -14,6 +14,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const { user, profile, loading } = useAuth();
 
   const isLoginPage = pathname === "/login";
+  const isAIAssistant = pathname === "/ai-assistant";
 
   // Route protection mapping
   const routePermissions: Record<string, string[]> = {
@@ -40,14 +41,14 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#09090b" }}>
-        <Loader2 className="animate-spin" size={24} style={{ color: "#14b8a6" }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#040914" }}>
+        <Loader2 className="animate-spin" size={24} style={{ color: "#3B82F6" }} />
       </div>
     );
   }
 
   if (isLoginPage) {
-    return <main className="min-h-screen" style={{ background: "#09090b" }}>{children}</main>;
+    return <main className="min-h-screen" style={{ background: "#040914" }}>{children}</main>;
   }
 
   // Protect all other routes
@@ -66,23 +67,24 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       
       <main
         className={cn(
-          "flex-1 min-h-screen flex flex-col transition-all duration-200",
+          "flex-1 flex flex-col transition-all duration-200",
           collapsed ? "lg:ml-[60px]" : "lg:ml-[220px]",
-          "ml-0"
+          "ml-0",
+          isAIAssistant ? "h-[100dvh] max-h-screen overflow-hidden" : "min-h-screen"
         )}
-        style={{ background: "#09090b" }}
+        style={{ background: "#040914" }}
       >
         <div className="lg:hidden flex items-center px-5 py-4 border-b sticky top-0 z-[40]"
           style={{ background: "#0c0c0e", borderColor: "rgba(255,255,255,0.06)" }}>
           <button
             onClick={() => setMobileOpen(true)}
             className="p-1.5 rounded-lg transition-colors"
-            style={{ background: "rgba(255,255,255,0.04)", color: "#71717a" }}
+            style={{ background: "rgba(255,255,255,0.04)", color: "#82A0CE" }}
           >
             <Menu size={16} />
           </button>
           <div className="ml-4 flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "#14b8a6" }}>
+            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "#3B82F6" }}>
               <div className="w-2.5 h-2.5 bg-white rounded-sm" />
             </div>
             <span className="font-semibold text-[13px] text-white tracking-tight">Maverick</span>

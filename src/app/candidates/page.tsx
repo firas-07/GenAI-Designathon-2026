@@ -148,7 +148,7 @@ export default function CandidatesPage() {
 
   const riskColor = (r: string) => {
     const map: Record<string, string> = { HIGH: "#ef4444", MEDIUM: "#f59e0b", LOW: "#10b981" };
-    return map[r?.toUpperCase()] || "#52525b";
+    return map[r?.toUpperCase()] || "#5271A3";
   };
 
   const stats = {
@@ -305,7 +305,7 @@ export default function CandidatesPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total Candidates", value: stats.total, color: "#14b8a6" },
+            { label: "Total Candidates", value: stats.total, color: "#3B82F6" },
             { label: "High Risk", value: stats.highRisk, color: "#ef4444" },
             { label: "Offered", value: stats.offered, color: "#10b981" },
             { label: "Discontinued", value: stats.discontinued, color: "#f59e0b" },
@@ -313,7 +313,7 @@ export default function CandidatesPage() {
             <div key={s.label} className="glass-card p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"
                 style={{ background: `${s.color}22`, color: s.color }}>{s.value}</div>
-              <p className="text-sm font-medium" style={{ color: "#71717a" }}>{s.label}</p>
+              <p className="text-sm font-medium" style={{ color: "#82A0CE" }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -321,16 +321,16 @@ export default function CandidatesPage() {
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 flex-wrap">
             <div className="relative w-full lg:w-52">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#52525b" }} />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#5271A3" }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search candidates..."
                 className="pl-9 pr-4 py-2 text-sm rounded-xl outline-none w-full"
                 style={{ background: "rgba(24, 24, 27,0.7)", border: "1px solid rgba(255,255,255,0.06)", color: "#e4e4e7" }} />
             </div>
-            <select value={filterRisk} onChange={e => setFilterRisk(e.target.value)} className="px-3 py-2 rounded-xl text-xs outline-none bg-[#18181b]/70 border border-white/[0.06] text-[#94a3b8]">
+            <select value={filterRisk} onChange={e => setFilterRisk(e.target.value)} className="px-3 py-2 rounded-xl text-xs outline-none bg-[#0B1221]/70 border border-white/[0.06] text-[#94a3b8]">
                 {["All Risk", "High Risk", "Medium Risk", "Low Risk"].map(r => <option key={r} value={r}>{r}</option>)}
             </select>
             <select value={filterBatch} onChange={e => setFilterBatch(e.target.value)}
-              className="px-3 py-2 rounded-xl text-xs outline-none bg-[#18181b]/70 border border-white/[0.06] text-[#94a3b8]">
+              className="px-3 py-2 rounded-xl text-xs outline-none bg-[#0B1221]/70 border border-white/[0.06] text-[#94a3b8]">
               <option value="All Batches">All Batches</option>
               {liveBatches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
@@ -351,7 +351,7 @@ export default function CandidatesPage() {
               Upload CSV
             </button>
             <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
-              style={{ background: "#14b8a6" }}>
+              style={{ background: "#3B82F6" }}>
               <Plus size={16} /> Add Candidate
             </button>
           </div>
@@ -363,7 +363,7 @@ export default function CandidatesPage() {
               <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: "rgba(255,255,255,0.02)" }}>
                 {["Candidate", "Batch", "Attendance", "Avg Score", "Status", "Risk Level", "Action"].map(h => (
                   <th key={h} className="text-left px-5 py-4 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: "#52525b" }}>{h}</th>
+                    style={{ color: "#5271A3" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -382,7 +382,7 @@ export default function CandidatesPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-xs font-medium" style={{ color: "#71717a" }}>{c.batch || c.batchName}</td>
+                  <td className="px-5 py-4 text-xs font-medium" style={{ color: "#82A0CE" }}>{c.batch || c.batchName}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs min-w-[32px]" style={{ color: (c.attendance || 0) < 60 ? "#ef4444" : (c.attendance || 0) < 75 ? "#f59e0b" : "#10b981" }}>
