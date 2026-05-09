@@ -1,10 +1,12 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const resend = new Resend(process.env.RESEND_API_KEY || 'dummy_key_for_build');
+    
     const { email, role, invitedBy } = await request.json();
     console.log(`[Invite API] Attempting to send invite to: ${email} for role: ${role}`);
 
