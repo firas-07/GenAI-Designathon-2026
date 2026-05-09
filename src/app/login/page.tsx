@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -24,11 +25,31 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
       router.push("/");
     } catch (err: any) {
-      const msg = err.code === "auth/invalid-credential" ? "Invalid email or password." : err.message;
+      let msg = err.message;
+      if (err.code === "auth/invalid-credential") msg = "Invalid email or password.";
+      if (err.code === "auth/email-already-in-use") msg = "This email is already registered.";
       setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      router.push("/");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -208,10 +229,33 @@ export default function LoginPage() {
                 {/* Button hover glow */}
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
                 
-                {loading ? <Loader2 size={18} className="animate-spin" /> : null}
-                {loading ? "Signing in..." : "Login"}
+                {loading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
               </button>
             </form>
+
+            <div className="mt-6 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-2 w-full">
+                <div className="h-[1px] flex-1 bg-white/5" />
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Or continue with</span>
+                <div className="h-[1px] flex-1 bg-white/5" />
+              </div>
+
+              <button 
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl border border-white/10 hover:bg-white/[0.02] text-white text-sm font-semibold transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                Sign in with Google
+              </button>
+
+              <button 
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-xs text-[#82A0CE] hover:text-white transition-colors"
+              >
+                {isSignUp ? "Already have an account? Login" : "Don't have an account? Create one"}
+              </button>
+            </div>
             
             <div className="mt-8 flex items-center justify-center gap-2 text-[#5271A3]">
               <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-[#1E2E50]" />

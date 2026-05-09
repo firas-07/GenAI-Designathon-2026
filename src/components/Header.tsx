@@ -135,8 +135,11 @@ export default function Header({ title, subtitle }: HeaderProps) {
               style={{ background: "rgba(59, 130, 246, 0.2)", border: "1px solid rgba(59, 130, 246, 0.5)" }}>
               {initials}
             </div>
-            <div className="hidden sm:flex items-center gap-1">
-              <span className="text-[13px] font-medium text-[#D8E3F5]">{displayName}</span>
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="flex flex-col items-end">
+                <span className="text-[13px] font-medium text-[#D8E3F5] leading-none">{displayName}</span>
+                <span className="text-[10px] text-[#5271A3] mt-1 uppercase tracking-wider font-bold">{profile?.role || "Admin"}</span>
+              </div>
               <ChevronDown size={14} className="text-[#82A0CE]" />
             </div>
           </div>

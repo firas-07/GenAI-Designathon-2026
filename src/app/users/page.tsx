@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { 
   collection, getDocs, query, doc, setDoc, deleteDoc, orderBy, 
-  onSnapshot, where 
+  onSnapshot, where, updateDoc 
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth, UserRole } from "@/context/AuthContext";
@@ -38,6 +38,16 @@ export default function UserManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    if (openMenuId) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
 
   useEffect(() => {
     // Real-time users
@@ -99,13 +109,13 @@ export default function UserManagement() {
         
         const result = await response.json();
         if (!response.ok) {
-          console.error("Resend API error:", result);
+          console.error("Invite API error:", result);
           setErrorMessage(result.error || "Failed to send email notification.");
         } else {
-          console.log("Resend API success:", result);
+          console.log("Invite API success:", result);
         }
       } catch (emailErr) {
-        console.error("Network error calling Resend API:", emailErr);
+        console.error("Network error calling Invite API:", emailErr);
       }
 
       setSuccessMessage(`Invitation sent to ${emailLower} as ${inviteRole}`);
@@ -125,6 +135,25 @@ export default function UserManagement() {
       await deleteDoc(doc(db, "invitations", email));
     } catch (err) {
       console.error("Error deleting invitation:", err);
+    }
+  };
+
+  const updateUserRole = async (uid: string, newRole: UserRole) => {
+    try {
+      await updateDoc(doc(db, "users", uid), { role: newRole });
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error("Error updating role:", err);
+    }
+  };
+
+  const revokeAccess = async (uid: string) => {
+    if (!confirm("Are you sure you want to revoke access for this user?")) return;
+    try {
+      await deleteDoc(doc(db, "users", uid));
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error("Error revoking access:", err);
     }
   };
 
@@ -243,7 +272,7 @@ export default function UserManagement() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           
           {/* Active Users Table */}
-          <div className="xl:col-span-2 rounded-2xl overflow-hidden" 
+          <div className="xl:col-span-2 rounded-2xl" 
             style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
             <div className="p-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
               <div className="flex items-center gap-2">
@@ -300,10 +329,48 @@ export default function UserManagement() {
                             <span className="text-[11px] text-emerald-500 font-medium">Active</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all">
+                        <td className="px-6 py-4 text-right relative">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === (user.uid || idx.toString()) ? null : (user.uid || idx.toString()));
+                            }}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                          >
                             <MoreHorizontal size={16} />
                           </button>
+
+                          {openMenuId === (user.uid || idx.toString()) && (
+                            <div 
+                              className="absolute right-full mr-2 top-0 w-48 py-2 rounded-xl shadow-2xl z-[100] border border-white/10 animate-in fade-in slide-in-from-right-2"
+                              style={{ background: "#0B1221" }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <div className="px-4 py-2 border-b border-white/5 mb-1">
+                                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Change Role</p>
+                              </div>
+                              {(["Admin", "Training Coordinator", "Trainer"] as UserRole[]).map((r) => (
+                                <button
+                                  key={r}
+                                  onClick={() => updateUserRole(user.uid, r)}
+                                  className={cn(
+                                    "w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/5",
+                                    user.role === r ? "text-blue-400 font-bold" : "text-zinc-300"
+                                  )}
+                                >
+                                  {r}
+                                </button>
+                              ))}
+                              <div className="h-[1px] bg-white/5 my-1" />
+                              <button 
+                                onClick={() => revokeAccess(user.uid)}
+                                className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                              >
+                                <Trash2 size={12} />
+                                Revoke Access
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
