@@ -3,11 +3,12 @@ import Header from "@/components/Header";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { Upload, AlertCircle, CheckCircle2, Clock, Loader2, X, UserCheck } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
-import { candidates } from "@/lib/mock-data";
+import { triggerSystemAlert } from "@/lib/governance";
+
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -36,52 +37,78 @@ export default function AttendancePage() {
   const [liveAttendanceTrend, setLiveAttendanceTrend] = useState<any[]>([]);
   const [lowAttendanceList, setLowAttendanceList] = useState<any[]>([]);
 
-  // Fetch Governance & Live Data
+  // Real-time Data Subscriptions
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const settingsSnap = await getDoc(doc(db, "settings", "governance"));
-        if (settingsSnap.exists()) {
-          setCutoffTime(settingsSnap.data().attendanceCutoff || "10:00");
-        }
+    // 1. Governance Settings
+    const unsubSettings = onSnapshot(doc(db, "settings", "governance"), (snap) => {
+      if (snap.exists()) setCutoffTime(snap.data().attendanceCutoff || "10:00");
+    });
 
-        const batchQ = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-        const batchSnap = await getDocs(batchQ);
-        const fireBatches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setLiveBatches(fireBatches);
-        if (fireBatches.length > 0) setSelectedBatch(fireBatches[0].name);
+    // 2. Batches (Filtered by Role)
+    const batchQ = query(collection(db, "batches"), orderBy("createdAt", "desc"));
+    const unsubBatches = onSnapshot(batchQ, (snap) => {
+      const allBatches = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const filtered = profile?.role === "Trainer" 
+        ? allBatches.filter(b => b.trainer === profile.name)
+        : allBatches;
+      setLiveBatches(filtered);
+      if (filtered.length > 0 && !selectedBatch) setSelectedBatch(filtered[0].name);
+    });
 
-        // Fetch Live Candidates for Alerts List
-        const candQ = query(collection(db, "candidates"), where("attendance", "<", 60));
-        const candSnap = await getDocs(candQ);
-        const fireLowCands = candSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setLowAttendanceList(fireLowCands);
-
-        // Build attendance trend from logs
-        const logQ = query(collection(db, "attendance_logs"), orderBy("date", "desc"));
-        const logSnap = await getDocs(logQ);
-        const logs = logSnap.docs.map(d => d.data());
-        // Group by date and compute percentage
-        const byDate: Record<string, {present: number; total: number}> = {};
-        logs.forEach(l => {
-          const d = l.date || "";
-          if (!d) return;
-          if (!byDate[d]) byDate[d] = { present: 0, total: 0 };
-          byDate[d].total++;
-          if (l.status === "Present" || l.status === "PRESENT") byDate[d].present++;
-        });
-        const trend = Object.entries(byDate)
-          .slice(0, 8)
-          .map(([date, v]) => ({ date: date.slice(5), percentage: v.total > 0 ? Math.round((v.present / v.total) * 100) : 0 }))
-          .reverse();
-        setLiveAttendanceTrend(trend);
-
-      } catch (error) {
-        console.error("Error fetching attendance data:", error);
+    // 3. Low Attendance Candidates (Real-time flags)
+    const lowCandQ = query(collection(db, "candidates"), where("attendance", "<", 60));
+    const unsubLowCands = onSnapshot(lowCandQ, (snap) => {
+      const allLow = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      if (profile?.role === "Trainer") {
+        const myBatchNames = liveBatches.map(b => b.name);
+        setLowAttendanceList(allLow.filter(c => myBatchNames.includes(c.batch)));
+      } else {
+        setLowAttendanceList(allLow);
       }
+    });
+
+    // 4. Attendance Logs (Real-time Trend & Stats)
+    const logQ = query(collection(db, "attendance_logs"), orderBy("date", "desc"));
+    const unsubLogs = onSnapshot(logQ, (snap) => {
+      const logs = snap.docs.map(d => d.data());
+      
+      // Update Today's Stats
+      const todayLog = logs.find(l => l.batch === selectedBatch && l.date === attendanceDate);
+      if (todayLog) {
+        setStats({
+          present: todayLog.presentCount || 0,
+          absent: todayLog.absentCount || 0,
+          rate: (todayLog.presentCount + todayLog.absentCount) > 0 
+            ? Math.round((todayLog.presentCount / (todayLog.presentCount + todayLog.absentCount)) * 100) 
+            : 0
+        });
+      } else {
+        setStats({ present: 0, absent: 0, rate: 0 });
+      }
+
+      // Group for Trend Chart
+      const byDate: Record<string, {present: number; total: number}> = {};
+      logs.forEach(l => {
+        const d = l.date || "";
+        if (!d) return;
+        if (!byDate[d]) byDate[d] = { present: 0, total: 0 };
+        byDate[d].total += (l.presentCount + l.absentCount);
+        byDate[d].present += l.presentCount;
+      });
+      const trend = Object.entries(byDate)
+        .slice(0, 8)
+        .map(([date, v]) => ({ date: date.slice(5), percentage: v.total > 0 ? Math.round((v.present / v.total) * 100) : 0 }))
+        .reverse();
+      setLiveAttendanceTrend(trend);
+    });
+
+    return () => {
+      unsubSettings();
+      unsubBatches();
+      unsubLowCands();
+      unsubLogs();
     };
-    fetchData();
-  }, []);
+  }, [profile, selectedBatch, attendanceDate, liveBatches.length]);
 
   const handleSendAlert = (name: string) => {
     showToast(`Governance Alert sent to ${name} and their parents via SMS.`, 'success');
@@ -100,8 +127,29 @@ export default function AttendancePage() {
       return showToast("Please upload CSV format only", 'error');
     }
 
+    if (!selectedBatch) {
+      return showToast("Please select a batch first", 'error');
+    }
+
     setIsSaving(true);
-    setTimeout(async () => {
+    
+    // Read and Parse CSV
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const rows = text.split('\n').filter(row => row.trim() !== '');
+      
+      // Skip header and count statuses
+      let present = 0;
+      let absent = 0;
+      
+      rows.slice(1).forEach(row => {
+        const columns = row.split(',');
+        const status = columns[2]?.trim().toUpperCase(); // Status is 3rd column (index 2)
+        if (status === 'PRESENT') present++;
+        else if (status === 'ABSENT' || status === 'LATE') absent++; // Counting LATE as absent/risk for now
+      });
+
       try {
         const now = new Date();
         const [cutoffHour, cutoffMin] = cutoffTime.split(":").map(Number);
@@ -112,19 +160,42 @@ export default function AttendancePage() {
           date: attendanceDate,
           uploadedBy: profile?.name || "Trainer",
           status: isLate ? "Late Submission" : "On-Time",
-          presentCount: 22,
-          absentCount: 3,
+          presentCount: present,
+          absentCount: absent,
           createdAt: now.toISOString()
         });
+
+        await addDoc(collection(db, "file_logs"), {
+          name: file.name,
+          type: "Attendance",
+          status: isLate ? "Partial" : "Success",
+          uploader: profile?.name || "Trainer",
+          records: rows.length - 1,
+          batch: selectedBatch,
+          timestamp: now.toISOString()
+        });
         
-        setStats({ present: 22, absent: 3, rate: 88 });
+        if (isLate) {
+          await triggerSystemAlert({
+            title: "Late Attendance Submission",
+            description: `Trainer ${profile?.name || "Trainer"} submitted attendance for ${selectedBatch} after the ${cutoffTime} cutoff.`,
+            severity: "Medium"
+          });
+        }
+        
+        setStats({ 
+          present, 
+          absent, 
+          rate: (present + absent) > 0 ? Math.round((present / (present + absent)) * 100) : 0 
+        });
         setIsSaving(false);
         showToast(isLate ? "Attendance Saved (Warning: Past Cutoff!)" : "Attendance Recorded Successfully!");
       } catch (err) {
         showToast("Error saving attendance", 'error');
         setIsSaving(false);
       }
-    }, 1500);
+    };
+    reader.readAsText(file);
   };
 
   const handleManualEntryStart = async () => {
@@ -135,13 +206,13 @@ export default function AttendancePage() {
       const students = snap.docs.map(d => ({ id: d.id, name: d.data().name, present: true }));
       
       if (students.length === 0) {
-        const mockStuds = candidates.filter(c => c.batchName === selectedBatch).map(c => ({ id: c.id, name: c.name, present: true }));
-        setManualStudents(mockStuds);
+        showToast("No candidates found in this batch.", "error");
+        setManualStudents([]);
       } else {
         setManualStudents(students);
       }
       
-      setShowManualModal(true);
+      setShowManualModal(students.length > 0);
     } catch (error) {
       showToast("Error loading students", 'error');
     }
@@ -163,6 +234,15 @@ export default function AttendancePage() {
         mode: "Manual",
         createdAt: new Date().toISOString()
       });
+
+      // TRIGGER SYSTEM ALERT: High Absenteeism
+      if (absent > 5) {
+        await triggerSystemAlert({
+          title: "Critical Absenteeism Spike",
+          description: `${absent} students marked absent in Batch ${selectedBatch} for ${attendanceDate}.`,
+          severity: "Critical"
+        });
+      }
 
       setStats({ present, absent, rate: Math.round((present/manualStudents.length)*100) });
       setShowManualModal(false);

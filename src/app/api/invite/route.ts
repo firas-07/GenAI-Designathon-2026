@@ -4,7 +4,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { email, role, invitedBy } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid or empty JSON body' }, { status: 400 });
+    }
+
+    const { email, role, invitedBy } = body;
     console.log(`[Invite API] Attempting to send EmailJS invite to: ${email} for role: ${role}`);
 
     if (!email || !role) {

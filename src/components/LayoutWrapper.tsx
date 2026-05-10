@@ -19,12 +19,17 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   // Route protection mapping
   const routePermissions: Record<string, string[]> = {
     "/users": ["Admin"],
+    "/settings": ["Admin"],
     "/audit": ["Admin"],
     "/reports": ["Admin", "Training Coordinator"],
-    "/analytics": ["Admin", "Training Coordinator"],
+    "/analytics": ["Admin", "Trainer"], // Training Coordinator doesn't have analytics in Sidebar
     "/feedback": ["Admin", "Training Coordinator"],
     "/candidates": ["Admin", "Training Coordinator"],
-    "/assessments": ["Admin", "Trainer"],
+    "/batches": ["Admin", "Training Coordinator", "Trainer"],
+    "/attendance": ["Admin", "Training Coordinator", "Trainer"],
+    "/assessments": ["Admin", "Training Coordinator", "Trainer"],
+    "/alerts": ["Admin", "Training Coordinator"],
+    "/files": ["Admin", "Training Coordinator", "Trainer"],
   };
 
   useEffect(() => {
@@ -33,8 +38,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     }
 
     // Role-based route guard
-    if (!loading && profile && routePermissions[pathname]) {
-      if (!routePermissions[pathname].includes(profile.role)) {
+    const cleanPath = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
+    if (!loading && profile && routePermissions[cleanPath]) {
+      if (!routePermissions[cleanPath].includes(profile.role)) {
+        console.warn(`[Guard] Unauthorized access attempt to ${cleanPath} by ${profile.role}`);
         router.push("/"); // Redirect to dashboard if unauthorized
       }
     }

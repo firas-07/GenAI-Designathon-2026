@@ -290,8 +290,7 @@ export default function UserManagement() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="text-zinc-500 text-[11px] uppercase tracking-wider">
-                    <th className="px-6 py-4 font-semibold">User</th>
-                    <th className="px-6 py-4 font-semibold">Role</th>
+                    <th className="px-6 py-4 font-semibold">User Details</th>
                     <th className="px-6 py-4 font-semibold">Status</th>
                     <th className="px-6 py-4 font-semibold text-right">Actions</th>
                   </tr>
@@ -299,7 +298,7 @@ export default function UserManagement() {
                 <tbody className="divide-y divide-white/5">
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-10 text-center text-zinc-500 text-sm">
+                      <td colSpan={3} className="px-6 py-10 text-center text-zinc-500 text-sm">
                         No active users found.
                       </td>
                     </tr>
@@ -307,73 +306,88 @@ export default function UserManagement() {
                     users.map((user, idx) => (
                       <tr key={user.uid || idx} className="hover:bg-white/[0.02] transition-colors group">
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-600/20 flex items-center justify-center text-[11px] font-bold text-blue-400 group-hover:scale-105 transition-transform">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-[12px] font-bold text-blue-400 group-hover:scale-105 transition-transform">
                               {user.name ? user.name[0].toUpperCase() : 'U'}
                             </div>
-                            <div>
-                              <p className="text-sm font-medium text-white">{user.name || 'Unknown User'}</p>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-white">{user.name || 'Unknown User'}</p>
+                                <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold border uppercase tracking-wider h-fit", getRoleBadgeColor(user.role))}>
+                                  {user.role}
+                                </span>
+                              </div>
                               <p className="text-[11px] text-zinc-500">{user.email}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wide", getRoleBadgeColor(user.role))}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
                           <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                             <span className="text-[11px] text-emerald-500 font-medium">Active</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right relative">
-                          {user.role !== "Admin" && (
-                            <>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuId(openMenuId === (user.uid || idx.toString()) ? null : (user.uid || idx.toString()));
-                                }}
-                                className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-                              >
-                                <MoreHorizontal size={16} />
-                              </button>
-
-                              {openMenuId === (user.uid || idx.toString()) && (
-                                <div 
-                                  className="absolute right-full mr-2 top-0 w-48 py-2 rounded-xl shadow-2xl z-[100] border border-white/10 animate-in fade-in slide-in-from-right-2"
-                                  style={{ background: "#0B1221" }}
-                                  onClick={e => e.stopPropagation()}
+                        <td className="px-6 py-4 text-right">
+                          <div className="relative inline-block text-left">
+                            {user.role !== "Admin" && (
+                              <>
+                                <button 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setOpenMenuId(openMenuId === (user.uid || idx.toString()) ? null : (user.uid || idx.toString()));
+                                  }}
+                                  className={cn(
+                                    "p-2 rounded-lg transition-all border border-transparent",
+                                    openMenuId === (user.uid || idx.toString()) 
+                                      ? "bg-blue-600/10 border-blue-600/20 text-blue-400" 
+                                      : "text-zinc-500 hover:text-white hover:bg-white/5"
+                                  )}
                                 >
-                                  <div className="px-4 py-2 border-b border-white/5 mb-1">
-                                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Change Role</p>
-                                  </div>
-                                  {(["Training Coordinator", "Trainer"] as UserRole[]).map((r) => (
-                                    <button
-                                      key={r}
-                                      onClick={() => updateUserRole(user.uid, r)}
-                                      className={cn(
-                                        "w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/5",
-                                        user.role === r ? "text-blue-400 font-bold" : "text-zinc-300"
-                                      )}
-                                    >
-                                      {r}
-                                    </button>
-                                  ))}
-                                  <div className="h-[1px] bg-white/5 my-1" />
-                                  <button 
-                                    onClick={() => revokeAccess(user.uid)}
-                                    className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                                  <MoreHorizontal size={18} />
+                                </button>
+
+                                {openMenuId === (user.uid || idx.toString()) && (
+                                  <div 
+                                    className="absolute right-0 top-full mt-2 w-52 py-2 rounded-xl shadow-2xl z-[100] border border-white/10 animate-in fade-in zoom-in-95 duration-200"
+                                    style={{ background: "#0B1221", backdropFilter: "blur(8px)" }}
+                                    onClick={e => e.stopPropagation()}
                                   >
-                                    <Trash2 size={12} />
-                                    Revoke Access
-                                  </button>
-                                </div>
-                              )}
-                            </>
-                          )}
+                                    <div className="px-4 py-2 border-b border-white/5 mb-2">
+                                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Assign New Role</p>
+                                    </div>
+                                    <div className="px-2 space-y-1">
+                                      {(["Training Coordinator", "Trainer"] as UserRole[]).map((r) => (
+                                        <button
+                                          key={r}
+                                          onClick={() => updateUserRole(user.uid, r)}
+                                          className={cn(
+                                            "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between",
+                                            user.role === r 
+                                              ? "bg-blue-600/10 text-blue-400 font-semibold" 
+                                              : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                                          )}
+                                        >
+                                          {r}
+                                          {user.role === r && <CheckCircle size={12} />}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="h-[1px] bg-white/5 my-2" />
+                                    <div className="px-2">
+                                      <button 
+                                        onClick={() => revokeAccess(user.uid)}
+                                        className="w-full text-left px-3 py-2 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 transition-all flex items-center gap-2"
+                                      >
+                                        <Trash2 size={14} />
+                                        Revoke System Access
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

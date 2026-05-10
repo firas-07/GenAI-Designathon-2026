@@ -3,7 +3,7 @@ import Header from "@/components/Header";
 import { FileText, Download, FileSpreadsheet, Filter, CheckCircle2, FileDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 
 const reportCategories = [
@@ -46,15 +46,16 @@ export default function ReportsPage() {
   const [liveBatches, setLiveBatches] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchBatches = async () => {
-      const q = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
+    const q = query(collection(db, "batches"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
       setLiveBatches(data);
-      if (data.length > 0) setSelectedBatch(data[0].name);
-    };
-    fetchBatches();
-  }, []);
+      if (data.length > 0 && !selectedBatch) setSelectedBatch(data[0].name);
+    }, (error) => {
+      console.error("Batch Sync Error:", error);
+    });
+    return () => unsubscribe();
+  }, [selectedBatch]);
 
   return (
     <div className="flex-1 flex flex-col">

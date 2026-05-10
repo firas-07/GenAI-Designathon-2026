@@ -1,18 +1,20 @@
 "use client";
 import Header from "@/components/Header";
 import { useState, useEffect } from "react";
-import type { BatchStatus } from "@/lib/mock-data";
+import type { BatchStatus } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, onSnapshot } from "firebase/firestore";
 import { Plus, Search, Users, CheckCircle2, Calendar, CheckSquare, Activity } from "lucide-react";
 
 const statusBadge = (s: BatchStatus) => {
   const map: Record<BatchStatus, string> = {
-    Running: "badge-running", Planned: "badge-planned",
-    Completed: "badge-completed", Closed: "badge-closed"
+    Running: "badge-running",
+    Planned: "badge-planned",
+    Completed: "badge-completed",
+    Closed: "badge-closed"
   };
-  return map[s];
+  return map[s] || "badge-closed";
 };
 
 export default function BatchesPage() {
@@ -28,24 +30,41 @@ export default function BatchesPage() {
   const [newBatchName, setNewBatchName] = useState("");
   const [newTrainer, setNewTrainer] = useState("Arjun Mehta");
 
-  // Fetch from Firestore on Load (BRD 6.2 Persistence)
+  // Real-time Data Subscriptions
   useEffect(() => {
-    const fetchBatches = async () => {
-      try {
-        const q = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        const firestoreBatches = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as any[];
-        
+    // We need both candidates and batches to calculate live enrollment counts and averages
+    const unsubCands = onSnapshot(collection(db, "candidates"), (candSnap) => {
+      const allCands = candSnap.docs.map(d => d.data());
+      
+      const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), (batchSnap) => {
+        const firestoreBatches = batchSnap.docs.map(doc => {
+          const data = doc.data();
+          const batchCands = allCands.filter((c: any) => c.batch === data.name);
+          
+          const actualCount = batchCands.length;
+          const avgAttendance = actualCount > 0 
+            ? Math.round(batchCands.reduce((acc: number, c: any) => acc + (c.attendance || 0), 0) / actualCount)
+            : 0;
+          const avgScore = actualCount > 0 
+            ? Math.round(batchCands.reduce((acc: number, c: any) => acc + (c.avgScore || 0), 0) / actualCount)
+            : 0;
+          
+          return { 
+            id: doc.id, 
+            ...data,
+            enrolled: actualCount,
+            attendance: avgAttendance,
+            avgScore: avgScore
+          };
+        });
         setDisplayBatches(firestoreBatches);
-      } catch (error) {
-        console.error("Error fetching batches:", error);
-      }
-    };
-    fetchBatches();
-  }, []);
+      });
+
+      return () => unsubBatches();
+    });
+
+    return () => unsubCands();
+  }, [profile]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -72,7 +91,7 @@ export default function BatchesPage() {
         batchId: `B26-${String(displayBatches.length + 1).padStart(3, '0')}`,
         name: newBatchName,
         status: "Running" as const,
-        trainer: newTrainer,
+        trainer: profile?.role === "Trainer" ? profile.name : newTrainer,
         avgAttendance: 0,
         avgScore: 0,
         enrolled: 0,
@@ -101,7 +120,10 @@ export default function BatchesPage() {
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden">
-      <Header title="Batch Management" subtitle="Create, track, and manage all training batches" />
+      <Header 
+        title={profile?.role === "Trainer" ? "My Batches" : "Batch Management"} 
+        subtitle={profile?.role === "Trainer" ? "Track and manage your assigned training sessions" : "Create, track, and manage all training batches"} 
+      />
       
       {/* UI Toast Notification */}
       {toast && (
@@ -209,18 +231,27 @@ export default function BatchesPage() {
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" 
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assigned Trainer</label>
-                <select 
-                  value={newTrainer}
-                  onChange={(e) => setNewTrainer(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500"
-                >
-                  <option>Arjun Mehta</option>
-                  <option>Sneha Rao</option>
-                  <option>Vikram Nair</option>
-                </select>
-              </div>
+              {profile?.role !== "Trainer" ? (
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assigned Trainer</label>
+                  <select 
+                    value={newTrainer}
+                    onChange={(e) => setNewTrainer(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500"
+                  >
+                    <option>Arjun Mehta</option>
+                    <option>Sneha Rao</option>
+                    <option>Vikram Nair</option>
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assigned Trainer</label>
+                  <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-400">
+                    {profile.name} (You)
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Start Date</label>

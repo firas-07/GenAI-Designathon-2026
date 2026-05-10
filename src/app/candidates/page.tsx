@@ -4,7 +4,7 @@ import { Search, Plus, Upload, X, Loader2, Trash2, Activity, Calendar } from "lu
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, increment, where, onSnapshot } from "firebase/firestore";
 
 export default function CandidatesPage() {
   const { profile } = useAuth();
@@ -23,28 +23,26 @@ export default function CandidatesPage() {
   const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch Live Candidates
-        const candQ = query(collection(db, "candidates"), orderBy("createdAt", "desc"));
-        const candSnap = await getDocs(candQ);
-        const fireCands = candSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-        setDisplayCandidates(fireCands);
+    // Real-time Candidates
+    const candQ = query(collection(db, "candidates"), orderBy("createdAt", "desc"));
+    const unsubCands = onSnapshot(candQ, (snap) => {
+      const fireCands = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      setDisplayCandidates(fireCands);
+    });
 
-        // Fetch Live Batches for Dropdowns
-        const batchQ = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-        const batchSnap = await getDocs(batchQ);
-        const fireBatches = batchSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-        setLiveBatches(fireBatches);
-        
-        // Default the new candidate batch to the latest live batch if available
-        if (fireBatches.length > 0) setNewBatch(fireBatches[0].name);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
+    // Real-time Batches
+    const batchQ = query(collection(db, "batches"), orderBy("createdAt", "desc"));
+    const unsubBatches = onSnapshot(batchQ, (snap) => {
+      const fireBatches = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      setLiveBatches(fireBatches);
+      if (fireBatches.length > 0 && !newBatch) setNewBatch(fireBatches[0].name);
+    });
+
+    return () => {
+      unsubCands();
+      unsubBatches();
     };
-    fetchData();
-  }, []);
+  }, [newBatch]); // Re-run if newBatch default logic is needed, though usually on mount is enough
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -64,7 +62,19 @@ export default function CandidatesPage() {
         status: "ACTIVE",
         createdAt: new Date().toISOString()
       };
+      // 1. Enroll Candidate
       const docRef = await addDoc(collection(db, "candidates"), newCandData);
+      
+      // 2. Sync with Batch Enrollment Count
+      const batchQ = query(collection(db, "batches"), where("name", "==", newBatch));
+      const batchSnap = await getDocs(batchQ);
+      if (!batchSnap.empty) {
+        const batchDoc = batchSnap.docs[0];
+        await updateDoc(doc(db, "batches", batchDoc.id), {
+          enrolled: increment(1)
+        });
+      }
+
       setDisplayCandidates([{ id: docRef.id, ...newCandData }, ...displayCandidates]);
       setIsSaving(false);
       setShowAddModal(false);
@@ -91,42 +101,98 @@ export default function CandidatesPage() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      const lines = text.split("\n").slice(1); // Skip header
+      // Robust splitting for both Windows (\r\n) and Unix (\n) line endings
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+      
+      // Skip the first line (header)
+      const dataLines = lines.slice(1);
       
       let count = 0;
       const newCands: any[] = [];
 
-      for (const line of lines) {
-        const [name, email, batch] = line.split(",").map(s => s.trim());
-        if (name && email && batch) {
-          const candData = {
-            name, email, batch,
-            attendance: 100, avgScore: 0, status: "ACTIVE", risk: "LOW",
-            createdAt: new Date().toISOString()
-          };
-          const docRef = await addDoc(collection(db, "candidates"), candData);
-          newCands.push({ id: docRef.id, ...candData });
-          count++;
-        }
-      }
+      try {
+        // Group by batch to minimize database calls
+        const batchCounts: Record<string, number> = {};
 
-      setDisplayCandidates(prev => [...newCands, ...prev]);
-      setIsSaving(false);
-      showToast(`Successfully enrolled ${count} candidates via Bulk Upload!`);
+        for (const line of dataLines) {
+          const columns = line.split(/[,\t;]/).map(s => s.trim().replace(/^["']|["']$/g, ""));
+          
+          if (columns.length >= 3) {
+            const [name, email, batch] = columns;
+            
+            // Basic validation: ensure email contains @ and all fields are present
+            if (name && email.includes("@") && batch) {
+              const candData = {
+                name, email, batch,
+                attendance: 100, avgScore: 0, status: "ACTIVE", risk: "LOW",
+                createdAt: new Date().toISOString()
+              };
+              await addDoc(collection(db, "candidates"), candData);
+              count++;
+              batchCounts[batch] = (batchCounts[batch] || 0) + 1;
+            }
+          }
+        }
+
+        // Sync Batch Enrollment Counts
+        for (const [batchName, addCount] of Object.entries(batchCounts)) {
+          const bQ = query(collection(db, "batches"), where("name", "==", batchName));
+          const bSnap = await getDocs(bQ);
+          if (!bSnap.empty) {
+            await updateDoc(doc(db, "batches", bSnap.docs[0].id), {
+              enrolled: increment(addCount)
+            });
+          }
+        }
+
+        // Governance: Log this upload to the Monitoring system
+        await addDoc(collection(db, "file_logs"), {
+          name: file.name,
+          type: "Candidates",
+          status: count > 0 ? "Success" : "Partial",
+          uploader: profile?.name || "Admin",
+          records: count,
+          batch: "Bulk Ingestion",
+          timestamp: new Date().toISOString()
+        });
+
+        setDisplayCandidates(prev => [...newCands, ...prev]);
+        setIsSaving(false);
+        if (count > 0) {
+          showToast(`Successfully enrolled ${count} candidates!`);
+        } else {
+          showToast("No valid records found. Check your CSV format.", "error");
+        }
+      } catch (err) {
+        console.error(err);
+        showToast("Error processing file", "error");
+        setIsSaving(false);
+      }
     };
     reader.readAsText(file);
   };
 
-  const handleDeleteCandidate = async (id: string) => {
+  const handleDeleteCandidate = async (candidate: any) => {
+    if (!window.confirm(`Are you sure you want to delete ${candidate.name}?`)) return;
     try {
-      // Only delete if it's a Firestore ID (longer than typical mock IDs)
-      if (id.length > 5) {
+      const id = candidate.id;
+      // 1. Delete from candidates
+      if (id && id.length > 5) {
         await deleteDoc(doc(db, "candidates", id));
+        
+        // 2. Decrement Batch Enrollment
+        const bQ = query(collection(db, "batches"), where("name", "==", candidate.batch));
+        const bSnap = await getDocs(bQ);
+        if (!bSnap.empty) {
+          await updateDoc(doc(db, "batches", bSnap.docs[0].id), {
+            enrolled: increment(-1)
+          });
+        }
+        showToast("Candidate removed successfully", 'success');
       }
-      setDisplayCandidates(prev => prev.filter(c => c.id !== id));
-      showToast("Entry removed successfully");
     } catch (error) {
-      showToast("Error deleting entry", 'error');
+      console.error("Delete Error:", error);
+      showToast("Error deleting entry from database", 'error');
     }
   };
 
@@ -410,7 +476,7 @@ export default function CandidatesPage() {
                         onClick={(e) => { e.stopPropagation(); setSelectedCandidate(c); }}
                         className="text-[10px] px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider transition-all hover:opacity-80 bg-teal-500/15 text-teal-400">View</button>
                       <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteCandidate(c.id); }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteCandidate(c); }}
                         className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all">
                         <Trash2 size={14} />
                       </button>

@@ -2,42 +2,74 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, addDoc, where, updateDoc, doc, onSnapshot } from "firebase/firestore";
 import Header from "@/components/Header";
 import { Upload, Trophy, TrendingUp, Loader2 } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { triggerSystemAlert } from "@/lib/governance";
 
 export default function AssessmentsPage() {
   const { profile } = useAuth();
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [assessmentType, setAssessmentType] = useState("Coding Assessment");
-  const [weekModule, setWeekModule] = useState("Week 6");
+  const [weekModule, setWeekModule] = useState("Week 1");
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   
   const [displayCandidates, setDisplayCandidates] = useState<any[]>([]);
   const [liveBatches, setLiveBatches] = useState<any[]>([]);
+  const [availableWeeks, setAvailableWeeks] = useState<string[]>([]);
+  const [viewingSnapshots, setViewingSnapshots] = useState<any[] | null>(null);
+  const [activeSnapshotWeek, setActiveSnapshotWeek] = useState<string>("Live");
 
-  // Fetch Live Data
+  // Fetch Live Data with Real-time listeners
   useEffect(() => {
+    if (!profile) return;
+
     const fetchData = async () => {
       try {
         const batchQ = query(collection(db, "batches"), orderBy("createdAt", "desc"));
         const batchSnap = await getDocs(batchQ);
-        const fireBatches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        const allBatches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        
+        const fireBatches = profile?.role === "Trainer" 
+          ? allBatches.filter(b => b.trainer === profile.name)
+          : allBatches;
+        
         setLiveBatches(fireBatches);
-        if (fireBatches.length > 0) setSelectedBatch(fireBatches[0].name);
+        if (fireBatches.length > 0 && !selectedBatch) {
+          setSelectedBatch(fireBatches[0].name);
+        }
 
-        const candQ = query(collection(db, "candidates"), orderBy("createdAt", "desc"));
-        const candSnap = await getDocs(candQ);
-        const fireCands = candSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setDisplayCandidates(fireCands);
+        if (selectedBatch) {
+          const snapQ = query(
+            collection(db, "assessment_snapshots"), 
+            where("batch", "==", selectedBatch)
+          );
+          const snapShot = await getDocs(snapQ);
+          const weeks = Array.from(new Set(snapShot.docs.map(d => d.data().week)));
+          setAvailableWeeks(weeks);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
+
     fetchData();
-  }, []);
+
+    const candQ = query(collection(db, "candidates"), orderBy("createdAt", "desc"));
+    const unsubscribeCandidates = onSnapshot(candQ, (snapshot) => {
+      const allCands = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      const finalCands = allCands.filter(c => 
+        c.email?.includes('@') && 
+        c.batch === selectedBatch
+      );
+      setDisplayCandidates(finalCands);
+    });
+
+    return () => {
+      unsubscribeCandidates();
+    };
+  }, [profile, selectedBatch]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -57,22 +89,130 @@ export default function AssessmentsPage() {
     if (!file.name.endsWith('.csv')) return showToast("Please upload CSV format only", 'error');
 
     setIsSaving(true);
-    setTimeout(async () => {
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const rows = text.split('\n').filter(row => row.trim() !== '');
+      
+      const performanceRecords: any[] = [];
+      let lowPerformersCount = 0;
+
+      for (const row of rows.slice(1)) {
+        const columns = row.split(',').map(s => s.trim());
+        if (columns.length < 5) continue;
+
+        const name = columns[0];
+        const email = columns[1];
+        const codingScore = parseInt(columns[2]) || 0;
+        const apiScore = parseInt(columns[3]) || 0;
+        const projectScore = parseInt(columns[4]) || 0;
+        const avgScore = Math.round((codingScore + apiScore + projectScore) / 3);
+
+        performanceRecords.push({ name, email, codingScore, apiScore, projectScore, avgScore });
+        if (avgScore < 60) lowPerformersCount++;
+      }
+
       try {
         await addDoc(collection(db, "assessment_logs"), {
           batch: selectedBatch,
-          type: assessmentType,
+          type: "Score Ingestion",
           module: weekModule,
           uploadedBy: profile?.name || "Trainer",
+          recordsCount: performanceRecords.length,
           createdAt: new Date().toISOString()
         });
+
+        await addDoc(collection(db, "file_logs"), {
+          name: file.name,
+          type: "Assessments",
+          status: "Success",
+          uploader: profile?.name || "Trainer",
+          records: performanceRecords.length,
+          batch: selectedBatch,
+          timestamp: new Date().toISOString()
+        });
+
+        for (const record of performanceRecords) {
+          const q = query(collection(db, "candidates"), where("email", "==", record.email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const candidateDoc = querySnapshot.docs[0];
+            const existing = candidateDoc.data();
+            
+            const finalCoding = record.codingScore > 0 ? record.codingScore : (existing.codingScore || 0);
+            const finalApi = record.apiScore > 0 ? record.apiScore : (existing.apiScore || 0);
+            const finalProject = record.projectScore > 0 ? record.projectScore : (existing.projectScore || 0);
+            const finalAvg = Math.round((finalCoding + finalApi + finalProject) / 3);
+
+            await updateDoc(doc(db, "candidates", candidateDoc.id), {
+              name: record.name,
+              avgScore: finalAvg,
+              codingScore: finalCoding,
+              apiScore: finalApi,
+              projectScore: finalProject,
+              lastAssessment: weekModule,
+              batch: selectedBatch
+            });
+
+            await addDoc(collection(db, "assessment_snapshots"), {
+              candidateId: candidateDoc.id,
+              candidateEmail: record.email,
+              name: record.name,
+              batch: selectedBatch,
+              week: weekModule,
+              codingScore: record.codingScore,
+              apiScore: record.apiScore,
+              projectScore: record.projectScore,
+              avgScore: record.avgScore,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            const newCandidateRef = await addDoc(collection(db, "candidates"), {
+              email: record.email,
+              name: record.name,
+              batch: selectedBatch,
+              avgScore: record.avgScore,
+              codingScore: record.codingScore,
+              apiScore: record.apiScore,
+              projectScore: record.projectScore,
+              lastAssessment: weekModule,
+              createdAt: new Date().toISOString()
+            });
+
+            await addDoc(collection(db, "assessment_snapshots"), {
+              candidateId: newCandidateRef.id,
+              candidateEmail: record.email,
+              name: record.name,
+              batch: selectedBatch,
+              week: weekModule,
+              codingScore: record.codingScore,
+              apiScore: record.apiScore,
+              projectScore: record.projectScore,
+              avgScore: record.avgScore,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+        
+        if (lowPerformersCount > 0) {
+          await triggerSystemAlert({
+            title: "Performance Redline Triggered",
+            description: `${lowPerformersCount} candidates in ${selectedBatch} scored below the 60% threshold in ${weekModule}.`,
+            severity: "High"
+          });
+        }
+
         setIsSaving(false);
-        showToast(`Successfully uploaded ${assessmentType} for ${weekModule}!`);
+        showToast(`Successfully processed ${performanceRecords.length} student scores!`);
       } catch (err) {
-        showToast("Error uploading scores", 'error');
+        console.error("Error updating scores:", err);
+        showToast("Error updating candidate records", 'error');
         setIsSaving(false);
       }
-    }, 1500);
+    };
+    reader.readAsText(file);
   };
 
   const topPerformers = [...displayCandidates].sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0)).slice(0, 5);
@@ -89,7 +229,29 @@ export default function AssessmentsPage() {
     { subject: "Project", value: avgProject },
   ];
 
-  const scoreColor = (s: number) => s >= 80 ? "#10b981" : s >= 60 ? "#5eead4" : s >= 40 ? "#f59e0b" : "#ef4444";
+  const handleViewSnapshot = async (week: string) => {
+    if (week === "Live") {
+      setViewingSnapshots(null);
+      setActiveSnapshotWeek("Live");
+      return;
+    }
+
+    try {
+      const q = query(
+        collection(db, "assessment_snapshots"),
+        where("batch", "==", selectedBatch),
+        where("week", "==", week)
+      );
+      const snap = await getDocs(q);
+      const records = snap.docs.map(d => d.data());
+      setViewingSnapshots(records);
+      setActiveSnapshotWeek(week);
+    } catch (err) {
+      console.error("Error loading snapshot:", err);
+    }
+  };
+
+  const displayedList = viewingSnapshots || displayCandidates;
 
   return (
     <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -118,20 +280,42 @@ export default function AssessmentsPage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="glass-card p-6">
             <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-6">Upload Scores</p>
-            <div className="space-y-4">
-              <select value={selectedBatch} onChange={e => setSelectedBatch(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
-                {liveBatches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-              </select>
-              <select value={assessmentType} onChange={e => setAssessmentType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none">
-                <option>Coding Assessment</option>
-                <option>API Design Exam</option>
-                <option>Project Milestone</option>
-              </select>
-              <input type="text" value={weekModule} onChange={e => setWeekModule(e.target.value)} placeholder="Week / Module" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none" />
+            <div className="space-y-5">
+              <div className="flex gap-4 mb-8">
+                <div className="flex-1 flex flex-col">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                    Target Batch
+                  </label>
+                  <select
+                    value={selectedBatch}
+                    onChange={(e) => setSelectedBatch(e.target.value)}
+                    className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select a batch...</option>
+                    {liveBatches.map(b => (
+                      <option key={b.id} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex-1 flex flex-col">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                    Week Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={weekModule}
+                    onChange={(e) => setWeekModule(e.target.value)}
+                    placeholder="e.g. Week 1"
+                    className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-700"
+                  />
+                </div>
+              </div>
+
               <input type="file" id="scoreUpload" hidden accept=".csv" onChange={handleFileUpload} />
-              <button onClick={() => document.getElementById('scoreUpload')?.click()} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all"
-                style={{ background: "#3B82F6" }}>
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Upload CSV
+              <button onClick={() => document.getElementById('scoreUpload')?.click()} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+                style={{ background: "#3B82F6", boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)" }}>
+                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Upload Scores CSV
               </button>
             </div>
           </div>
@@ -173,24 +357,61 @@ export default function AssessmentsPage() {
         </div>
 
         <div className="glass-card overflow-hidden">
-          <div className="px-6 py-5 border-b border-white/[0.06]">
-            <p className="text-base font-bold text-white uppercase tracking-wider text-xs">Assessment Score Sheet</p>
+          <div className="px-6 py-4 border-b border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Assessment Score Sheet</p>
+            
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+              <span className="text-[9px] text-zinc-500 uppercase font-bold mr-2">History:</span>
+              <button 
+                onClick={() => handleViewSnapshot("Live")}
+                className={`px-3 py-1 rounded-full text-[9px] font-bold transition-all ${activeSnapshotWeek === "Live" ? "bg-teal-500 text-white shadow-[0_0_10px_rgba(20,184,166,0.4)]" : "bg-zinc-900 text-zinc-500 border border-zinc-800 hover:border-zinc-700"}`}
+              >
+                LIVE VIEW
+              </button>
+              {availableWeeks.sort().map(week => (
+                <button 
+                  key={week}
+                  onClick={() => handleViewSnapshot(week)}
+                  className={`px-3 py-1 rounded-full text-[9px] font-bold transition-all whitespace-nowrap ${activeSnapshotWeek === week ? "bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.4)]" : "bg-zinc-900 text-zinc-500 border border-zinc-800 hover:border-zinc-700"}`}
+                >
+                  {week.toUpperCase()}
+                </button>
+              ))}
+            </div>
           </div>
+          
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-white/[0.02] border-b border-white/[0.06]">
-                  {["Candidate", "Coding", "API", "Project", "Overall", "Grade"].map(h => <th key={h} className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-zinc-500">{h}</th>)}
+                <tr className="border-b border-zinc-800">
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Candidate</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Coding</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">API</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Project</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Overall</th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Grade</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
-                {displayCandidates.map((c) => (
-                  <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4"><p className="text-sm font-bold text-white">{c.name}</p></td>
+              <tbody className="divide-y divide-zinc-800/50">
+                {displayedList.map((c: any, i: number) => (
+                  <tr key={c.id || i} className="hover:bg-zinc-900/30 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors">{c.name}</span>
+                        <span className="text-[10px] text-zinc-500">{c.email}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-xs font-medium text-zinc-400">{c.codingScore || 0}%</td>
                     <td className="px-6 py-4 text-xs font-medium text-zinc-400">{c.apiScore || 0}%</td>
                     <td className="px-6 py-4 text-xs font-medium text-zinc-400">{c.projectScore || 0}%</td>
-                    <td className="px-6 py-4 text-xs font-bold text-teal-400">{c.avgScore || 0}%</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-teal-400">{c.avgScore || 0}%</span>
+                        <span className="px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-[9px] text-teal-400 uppercase tracking-tighter">
+                          {c.lastAssessment || c.week || "Latest"}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold text-white ${ (c.avgScore || 0) >= 85 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-teal-500/20 text-teal-400' }`}>Grade {calculateGrade(c.avgScore || 0)}</span>
                     </td>
@@ -204,7 +425,3 @@ export default function AssessmentsPage() {
     </div>
   );
 }
-
-
-
-

@@ -2,10 +2,11 @@
 import Header from "@/components/Header";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, query, orderBy, addDoc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { MessageSquare, Star, Send, Layers, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { triggerSystemAlert } from "@/lib/governance";
 
 export default function FeedbackPage() {
   const { profile } = useAuth();
@@ -17,17 +18,16 @@ export default function FeedbackPage() {
   const [liveBatches, setLiveBatches] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchBatches = async () => {
-      try {
-        const q = query(collection(db, "batches"), orderBy("createdAt", "desc"));
-        const snap = await getDocs(q);
-        const fireBatches = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setLiveBatches(fireBatches);
-        if (fireBatches.length > 0) setSelectedBatch(fireBatches[0].name);
-      } catch (e) { console.error(e); }
-    };
-    fetchBatches();
-  }, []);
+    const q = query(collection(db, "batches"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const fireBatches = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+      setLiveBatches(fireBatches);
+      if (fireBatches.length > 0 && !selectedBatch) setSelectedBatch(fireBatches[0].name);
+    }, (error) => {
+      console.error("Batch Sync Error:", error);
+    });
+    return () => unsubscribe();
+  }, [selectedBatch]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -47,6 +47,16 @@ export default function FeedbackPage() {
         trainer: profile?.name || "Trainer",
         createdAt: new Date().toISOString()
       });
+
+      // Trigger real-time system alert for Admins/Coordinators
+      await triggerSystemAlert({
+        title: `New Batch Review: ${selectedBatch}`,
+        description: `Trainer Insight: "${comment}". Rating: ${rating}/5. Submitted by ${profile?.name || 'Trainer'}.`,
+        severity: rating <= 2 ? 'High' : 'Low',
+        type: 'feedback',
+        link: '/audit'
+      });
+
       showToast("Batch feedback submitted successfully!");
       setComment("");
     } catch (err) {

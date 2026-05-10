@@ -20,7 +20,7 @@ const navItems = [
   { href: "/settings",         label: "System Settings",      icon: Settings,        roles: ["Admin"] },
   { href: "/analytics",        label: "Analytics",            icon: BarChart3,       roles: ["Admin"] },
   { href: "/audit",            label: "Audit Logs",           icon: Shield,          roles: ["Admin"] },
-  { href: "/files",            label: "File Monitoring",      icon: FolderSearch,    roles: ["Admin"] },
+  { href: "/files",            label: "File Monitoring",      icon: FolderSearch,    roles: ["Admin", "Training Coordinator"] },
   { href: "/alerts",           label: "Alerts Configuration", icon: Bell,            roles: ["Admin"] },
 
   // Training Coordinator specific
@@ -102,7 +102,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen, collapsed, setColla
         {/* Nav */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-0.5 custom-scrollbar">
           {filteredNavItems.map(({ href, label, icon: Icon }, index) => {
-            const active = pathname === href;
+            const active = pathname === href || (href !== "/" && pathname.startsWith(href));
             return (
               <Link
                 key={`${href}-${label}-${index}`}

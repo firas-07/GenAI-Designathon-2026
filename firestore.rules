@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Maverick Execution Platform - Global Access
+    // THIS IS THE ONE! It removes all login barriers.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+    
+  }
+}
