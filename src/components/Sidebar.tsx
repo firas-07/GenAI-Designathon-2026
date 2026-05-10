@@ -21,8 +21,7 @@ const navItems = [
   { href: "/analytics",        label: "Analytics",            icon: BarChart3,       roles: ["Admin"] },
   { href: "/audit",            label: "Audit Logs",           icon: Shield,          roles: ["Admin"] },
   { href: "/files",            label: "File Monitoring",      icon: FolderSearch,    roles: ["Admin"] },
-  { href: "/admin-alerts",     label: "Alerts Configuration", icon: Bell,            roles: ["Admin"] },
-  { href: "/ai-assistant",     label: "AI Insights",          icon: Bot,             roles: ["Admin"] },
+  { href: "/alerts",           label: "Alerts Configuration", icon: Bell,            roles: ["Admin"] },
 
   // Training Coordinator specific
   { href: "/batches",          label: "Batch Management",     icon: Layers,          roles: ["Training Coordinator"] },
@@ -32,7 +31,6 @@ const navItems = [
   { href: "/feedback",         label: "Feedback",             icon: MessageSquare,   roles: ["Training Coordinator"] },
   { href: "/reports",          label: "Reports",              icon: FileDown,        roles: ["Training Coordinator"] },
   { href: "/alerts",           label: "Alerts",               icon: Bell,            roles: ["Training Coordinator"] },
-  { href: "/ai-assistant",     label: "AI Assistant",         icon: Bot,             roles: ["Training Coordinator"] },
 
   // Trainer specific
   { href: "/batches",          label: "My Batches",           icon: Layers,          roles: ["Trainer"] },
@@ -40,7 +38,6 @@ const navItems = [
   { href: "/assessments",      label: "Assessment Upload",    icon: BookOpen,        roles: ["Trainer"] },
   { href: "/files",            label: "Uploads / Documents",  icon: FolderSearch,    roles: ["Trainer"] },
   { href: "/analytics",        label: "Performance View",     icon: BarChart3,       roles: ["Trainer"] },
-  { href: "/ai-assistant",     label: "AI Assistant",         icon: Bot,             roles: ["Trainer"] },
 ];
 
 interface SidebarProps {

@@ -4,25 +4,32 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, create
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Mail, Lock, AlertCircle, Layers, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Mail, Lock, AlertCircle, Layers, Eye, EyeOff, ShieldCheck, ShieldX, X } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const { user } = useAuth();
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
+  const { user, profile, loading, accessDenied } = useAuth();
   const router = useRouter();
 
+  // Only redirect once Firestore profile is confirmed (prevents race condition with Google sign-in)
   useEffect(() => {
-    if (user) router.push("/");
-  }, [user, router]);
+    if (!loading && user && profile) router.push("/");
+  }, [user, profile, loading, router]);
+
+  // Show access denied modal when the context fires it
+  useEffect(() => {
+    if (accessDenied) setShowAccessDenied(true);
+  }, [accessDenied]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError("");
     try {
       if (isSignUp) {
@@ -30,33 +37,76 @@ export default function LoginPage() {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      router.push("/");
     } catch (err: any) {
       let msg = err.message;
       if (err.code === "auth/invalid-credential") msg = "Invalid email or password.";
       if (err.code === "auth/email-already-in-use") msg = "This email is already registered.";
       setError(msg);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setLoading(true);
+    setSubmitting(true);
     setError("");
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      router.push("/");
+      // Don't navigate here — AuthContext will handle profile check
+      // and set accessDenied + sign out if the email is not registered
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen flex w-full" style={{ background: "#040914" }}>
+
+      {/* ── Access Denied Modal ── */}
+      {showAccessDenied && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-sm mx-4 rounded-2xl p-8 flex flex-col items-center text-center shadow-2xl"
+            style={{
+              background: "linear-gradient(145deg, rgba(11,18,33,0.97) 0%, rgba(4,9,20,0.99) 100%)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.6), 0 0 30px rgba(239,68,68,0.1)"
+            }}
+          >
+            <button
+              onClick={() => setShowAccessDenied(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+            >
+              <X size={16} />
+            </button>
+
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}
+            >
+              <ShieldX size={28} className="text-red-400" />
+            </div>
+
+            <h3 className="text-xl font-bold text-white mb-2">Access Denied</h3>
+            <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+              You do not have access to use this application.<br />
+              Please contact your administrator to get access.
+            </p>
+
+            <button
+              onClick={() => setShowAccessDenied(false)}
+              className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ background: "linear-gradient(to right, #dc2626, #ef4444)" }}
+            >
+              OK, Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Background abstract gradients matching the image */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Deep blue background */}
@@ -219,7 +269,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={submitting}
                 className="w-full py-4 rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-70 mt-4 relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98]"
                 style={{ 
                   background: "linear-gradient(to right, #2563EB, #3B82F6)",
@@ -229,7 +279,7 @@ export default function LoginPage() {
                 {/* Button hover glow */}
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
                 
-                {loading ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
+                {submitting ? "Processing..." : (isSignUp ? "Create Account" : "Login")}
               </button>
             </form>
 
@@ -242,19 +292,13 @@ export default function LoginPage() {
 
               <button 
                 onClick={handleGoogleLogin}
-                disabled={loading}
+                disabled={submitting}
                 className="w-full py-3.5 rounded-xl border border-white/10 hover:bg-white/[0.02] text-white text-sm font-semibold transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
               >
                 <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
                 Sign in with Google
               </button>
 
-              <button 
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-xs text-[#82A0CE] hover:text-white transition-colors"
-              >
-                {isSignUp ? "Already have an account? Login" : "Don't have an account? Create one"}
-              </button>
             </div>
             
             <div className="mt-8 flex items-center justify-center gap-2 text-[#5271A3]">

@@ -1,5 +1,6 @@
 "use client";
 import Sidebar from "@/components/Sidebar";
+import AIChatBot from "@/components/AIChatBot";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Menu, Loader2 } from "lucide-react";
@@ -14,7 +15,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const { user, profile, loading } = useAuth();
 
   const isLoginPage = pathname === "/login";
-  const isAIAssistant = pathname === "/ai-assistant";
 
   // Route protection mapping
   const routePermissions: Record<string, string[]> = {
@@ -71,7 +71,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           "flex-1 flex flex-col transition-all duration-200",
           collapsed ? "lg:ml-[60px]" : "lg:ml-[220px]",
           "ml-0",
-          isAIAssistant ? "h-[100dvh] max-h-screen overflow-hidden" : "min-h-screen"
+          "min-h-screen"
         )}
         style={{ background: "#040914" }}
       >
@@ -93,6 +93,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         </div>
 
         {children}
+        <AIChatBot />
       </main>
     </div>
   );

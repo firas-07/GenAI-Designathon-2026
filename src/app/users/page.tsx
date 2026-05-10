@@ -212,7 +212,6 @@ export default function UserManagement() {
                     >
                       <option value="Trainer">Trainer</option>
                       <option value="Training Coordinator">Training Coordinator</option>
-                      <option value="Admin">Admin</option>
                     </select>
                   </div>
                 </div>
@@ -330,46 +329,50 @@ export default function UserManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right relative">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(openMenuId === (user.uid || idx.toString()) ? null : (user.uid || idx.toString()));
-                            }}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
-                          >
-                            <MoreHorizontal size={16} />
-                          </button>
-
-                          {openMenuId === (user.uid || idx.toString()) && (
-                            <div 
-                              className="absolute right-full mr-2 top-0 w-48 py-2 rounded-xl shadow-2xl z-[100] border border-white/10 animate-in fade-in slide-in-from-right-2"
-                              style={{ background: "#0B1221" }}
-                              onClick={e => e.stopPropagation()}
-                            >
-                              <div className="px-4 py-2 border-b border-white/5 mb-1">
-                                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Change Role</p>
-                              </div>
-                              {(["Admin", "Training Coordinator", "Trainer"] as UserRole[]).map((r) => (
-                                <button
-                                  key={r}
-                                  onClick={() => updateUserRole(user.uid, r)}
-                                  className={cn(
-                                    "w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/5",
-                                    user.role === r ? "text-blue-400 font-bold" : "text-zinc-300"
-                                  )}
-                                >
-                                  {r}
-                                </button>
-                              ))}
-                              <div className="h-[1px] bg-white/5 my-1" />
+                          {user.role !== "Admin" && (
+                            <>
                               <button 
-                                onClick={() => revokeAccess(user.uid)}
-                                className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuId(openMenuId === (user.uid || idx.toString()) ? null : (user.uid || idx.toString()));
+                                }}
+                                className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
                               >
-                                <Trash2 size={12} />
-                                Revoke Access
+                                <MoreHorizontal size={16} />
                               </button>
-                            </div>
+
+                              {openMenuId === (user.uid || idx.toString()) && (
+                                <div 
+                                  className="absolute right-full mr-2 top-0 w-48 py-2 rounded-xl shadow-2xl z-[100] border border-white/10 animate-in fade-in slide-in-from-right-2"
+                                  style={{ background: "#0B1221" }}
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <div className="px-4 py-2 border-b border-white/5 mb-1">
+                                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Change Role</p>
+                                  </div>
+                                  {(["Training Coordinator", "Trainer"] as UserRole[]).map((r) => (
+                                    <button
+                                      key={r}
+                                      onClick={() => updateUserRole(user.uid, r)}
+                                      className={cn(
+                                        "w-full text-left px-4 py-2 text-xs transition-colors hover:bg-white/5",
+                                        user.role === r ? "text-blue-400 font-bold" : "text-zinc-300"
+                                      )}
+                                    >
+                                      {r}
+                                    </button>
+                                  ))}
+                                  <div className="h-[1px] bg-white/5 my-1" />
+                                  <button 
+                                    onClick={() => revokeAccess(user.uid)}
+                                    className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2"
+                                  >
+                                    <Trash2 size={12} />
+                                    Revoke Access
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>
