@@ -1,6 +1,7 @@
 "use client";
 import Header from "@/components/Header";
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, onSnapshot } from "firebase/firestore";
@@ -123,8 +124,11 @@ export default function AttendancePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
-      return showToast("Please upload CSV format only", 'error');
+    const isCSV = file.name.endsWith('.csv');
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (!isCSV && !isExcel) {
+      return showToast("Please upload CSV or Excel format only", 'error');
     }
 
     if (!selectedBatch) {
@@ -133,24 +137,37 @@ export default function AttendancePage() {
 
     setIsSaving(true);
     
-    // Read and Parse CSV
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const rows = text.split('\n').filter(row => row.trim() !== '');
-      
-      // Skip header and count statuses
       let present = 0;
       let absent = 0;
-      
-      rows.slice(1).forEach(row => {
-        const columns = row.split(',');
-        const status = columns[2]?.trim().toUpperCase(); // Status is 3rd column (index 2)
-        if (status === 'PRESENT') present++;
-        else if (status === 'ABSENT' || status === 'LATE') absent++; // Counting LATE as absent/risk for now
-      });
+      let recordsCount = 0;
 
       try {
+        if (isCSV) {
+          const text = event.target?.result as string;
+          const rows = text.split('\n').filter(row => row.trim() !== '');
+          recordsCount = rows.length - 1;
+          rows.slice(1).forEach(row => {
+            const columns = row.split(',');
+            const status = columns[2]?.trim().toUpperCase(); 
+            if (status === 'PRESENT') present++;
+            else if (status === 'ABSENT' || status === 'LATE') absent++;
+          });
+        } else {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
+          recordsCount = jsonData.length - 1;
+          jsonData.slice(1).forEach(row => {
+            const status = row[2]?.toString().trim().toUpperCase();
+            if (status === 'PRESENT') present++;
+            else if (status === 'ABSENT' || status === 'LATE') absent++;
+          });
+        }
+
         const now = new Date();
         const [cutoffHour, cutoffMin] = cutoffTime.split(":").map(Number);
         const isLate = now.getHours() > cutoffHour || (now.getHours() === cutoffHour && now.getMinutes() > cutoffMin);
@@ -170,7 +187,7 @@ export default function AttendancePage() {
           type: "Attendance",
           status: isLate ? "Partial" : "Success",
           uploader: profile?.name || "Trainer",
-          records: rows.length - 1,
+          records: recordsCount,
           batch: selectedBatch,
           timestamp: now.toISOString()
         });
@@ -195,7 +212,11 @@ export default function AttendancePage() {
         setIsSaving(false);
       }
     };
-    reader.readAsText(file);
+    if (isCSV) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   };
 
   const handleManualEntryStart = async () => {
@@ -320,37 +341,39 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <p className="text-base font-bold text-white">Upload Attendance</p>
-              <p className="text-[10px] text-zinc-500 font-medium mt-1 uppercase tracking-wider">Sync records from CSV or manual entry</p>
+        {profile?.role === "Trainer" && (
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-base font-bold text-white">Upload Attendance</p>
+                <p className="text-[10px] text-zinc-500 font-medium mt-1 uppercase tracking-wider">Sync records from CSV or manual entry</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                <Clock size={12} />
+                <span>Cutoff: {cutoffTime} daily</span>
+              </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-              <Clock size={12} />
-              <span>Cutoff: {cutoffTime} daily</span>
-            </div>
-          </div>
-          <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
-            <div className="flex-1 flex items-center gap-4">
-              <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500 min-w-[200px]">
-                {liveBatches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-              </select>
-              <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500" />
-            </div>
-            <div className="flex gap-3">
-              <input type="file" id="attnUpload" hidden accept=".csv" onChange={handleFileUpload} />
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
+              <div className="flex-1 flex items-center gap-4">
+                <select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500 min-w-[200px]">
+                  {liveBatches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                </select>
+                <input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className="bg-[#0B1221]/70 border border-white/[0.06] rounded-xl px-4 py-2 text-sm text-zinc-300 outline-none focus:border-teal-500" />
+              </div>
+              <div className="flex gap-3">
+              <input type="file" id="attnUpload" hidden accept=".csv,.xlsx,.xls" onChange={handleFileUpload} />
               <button onClick={() => document.getElementById('attnUpload')?.click()} disabled={isSaving} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg shadow-black/20 transition-all hover:scale-[1.02]" style={{ background: "#3B82F6" }}>
-                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Upload CSV
-              </button>
-              <button 
-                onClick={handleManualEntryStart}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold text-zinc-400 border border-white/[0.08] hover:bg-white/[0.02] transition-all">
-                Manual Entry
-              </button>
+                  {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Upload CSV
+                </button>
+                <button 
+                  onClick={handleManualEntryStart}
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold text-zinc-400 border border-white/[0.08] hover:bg-white/[0.02] transition-all">
+                  Manual Entry
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Manual Entry Modal */}
         {showManualModal && (
@@ -409,7 +432,7 @@ export default function AttendancePage() {
         <div className="glass-card p-6">
           <p className="text-base font-bold text-white mb-1">Attendance Trend (Last 8 Days)</p>
           <p className="text-xs mb-5" style={{ color: "#5271A3" }}>{selectedBatch || "All Batches"} — Last 8 logged sessions</p>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={220} minWidth={0}>
             <AreaChart data={liveAttendanceTrend.length > 0 ? liveAttendanceTrend : []}>
               <defs>
                 <linearGradient id="attGrad" x1="0" y1="0" x2="0" y2="1">

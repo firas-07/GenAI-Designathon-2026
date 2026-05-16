@@ -49,8 +49,34 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#040914" }}>
-        <Loader2 className="animate-spin" size={24} style={{ color: "#3B82F6" }} />
+      <div className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden" style={{ background: "#040914" }}>
+        {/* Abstract background glows to match theme */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#2563EB] opacity-10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#3B82F6] opacity-10 blur-[100px] rounded-full" />
+        
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Logo Animation */}
+          <div className="w-16 h-16 mb-8 relative">
+            <div className="absolute inset-0 bg-blue-500/20 rounded-2xl animate-ping" />
+            <div className="relative w-full h-full rounded-2xl bg-gradient-to-br from-[#3B82F6] to-[#1E3A8A] flex items-center justify-center shadow-2xl shadow-blue-500/20 border border-white/10">
+              <div className="w-6 h-6 bg-white rounded-md animate-pulse" />
+            </div>
+          </div>
+          
+          {/* Text & Loading Indicator */}
+          <div className="flex flex-col items-center gap-4">
+            <h2 className="text-white font-bold text-xl tracking-[0.2em] uppercase">Maverick</h2>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/5 backdrop-blur-sm">
+              <Loader2 className="animate-spin text-blue-400" size={16} />
+              <span className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Initializing System...</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom indicator */}
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
+          <p className="text-[10px] text-[#5271A3] uppercase tracking-[0.3em] font-black opacity-50">Talent Execution Platform</p>
+        </div>
       </div>
     );
   }

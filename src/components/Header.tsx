@@ -1,8 +1,7 @@
 "use client";
-import { Bell, Search, Settings, ChevronDown, LogOut } from "lucide-react";
+import { Search, ChevronDown, LogOut } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
-import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, query, onSnapshot } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,20 +16,9 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   const router = useRouter();
   const { profile } = useAuth();
-  const [liveAlertCount, setLiveAlertCount] = useState(0);
   const [searchVal, setSearchVal] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const q = query(collection(db, "system_alerts"));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      // Filtering for high severity as an example of badge focus
-      const high = snap.docs.filter(d => d.data().severity?.toLowerCase() === "high" || d.data().severity?.toLowerCase() === "critical").length;
-      setLiveAlertCount(snap.size); // Show total count on badge
-    });
-    return () => unsubscribe();
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -105,26 +93,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
           />
         </div>
 
-        {/* Alert Bell - Hidden for Trainer */}
-        {!isTrainer && (
-          <Link
-            href="/alerts"
-            className="relative w-9 h-9 flex items-center justify-center transition-colors hover:bg-white/5 rounded-full"
-            style={{ color: "#82A0CE" }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = "#e4e4e7")}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = "#82A0CE")}
-          >
-            <Bell size={20} />
-            {liveAlertCount > 0 && (
-              <span
-                className="absolute top-0 right-0 w-4 h-4 rounded-full flex items-center justify-center text-white font-bold"
-                style={{ background: "#ef4444", fontSize: "10px", border: "2px solid #040914" }}
-              >
-                {liveAlertCount}
-              </span>
-            )}
-          </Link>
-        )}
+
 
         {/* User Profile with Dropdown */}
         <div className="relative mr-4" ref={dropdownRef}>
@@ -155,14 +124,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
               <div className="px-4 py-2 mb-1 border-b border-white/5">
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Account Settings</p>
               </div>
-              <Link
-                href="/settings"
-                className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-zinc-300 transition-all hover:bg-white/5 hover:text-white"
-                onClick={() => setDropdownOpen(false)}
-              >
-                <Settings size={15} />
-                System Settings
-              </Link>
+
               <div className="h-[1px] bg-white/5 my-1" />
               <button
                 onClick={handleLogout}

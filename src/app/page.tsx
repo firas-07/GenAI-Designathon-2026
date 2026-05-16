@@ -218,49 +218,51 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Alerts List */}
-        <div className="rounded-[16px] p-6" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-[15px] font-semibold text-white">Recent Alerts</h2>
-            <button className="text-[12px] font-medium text-[#3B82F6] hover:text-[#60A5FA] flex items-center gap-1 transition-colors">
-              View All Alerts &rarr;
-            </button>
+        {/* Recent Alerts List - Only show if data available */}
+        {recentAlerts.length > 0 && (
+          <div className="rounded-[16px] p-6" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-[15px] font-semibold text-white">Recent Alerts</h2>
+              <button className="text-[12px] font-medium text-[#3B82F6] hover:text-[#60A5FA] flex items-center gap-1 transition-colors">
+                View All Alerts &rarr;
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {loading ? (
+                [1, 2, 3].map(i => (
+                  <div key={i} className="h-16 w-full animate-pulse rounded-xl bg-white/5" />
+                ))
+              ) : (
+                recentAlerts.map((alert, idx) => {
+                  const Icon = alert.icon;
+                  return (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl transition-colors hover:bg-white/[0.02]" style={{ border: "1px solid rgba(255,255,255,0.04)", background: "rgba(11, 18, 33, 0.4)" }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${alert.color}15` }}>
+                        <Icon size={20} style={{ color: alert.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-white mb-0.5">{alert.title}</p>
+                        <p className="text-[12px] text-[#82A0CE]">{alert.desc}</p>
+                      </div>
+                      <div className="flex items-center gap-6 mt-2 sm:mt-0">
+                        <span className="px-3 py-1 rounded-full text-[11px] font-medium border" 
+                          style={{ 
+                            color: alert.color, 
+                            borderColor: `${alert.color}40`,
+                            background: `${alert.color}10`
+                          }}>
+                          {alert.status}
+                        </span>
+                        <span className="text-[12px] text-[#5271A3] w-16 text-right">{alert.time}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
-          
-          <div className="space-y-3">
-            {loading ? (
-              [1, 2, 3].map(i => (
-                <div key={i} className="h-16 w-full animate-pulse rounded-xl bg-white/5" />
-              ))
-            ) : (
-              recentAlerts.map((alert, idx) => {
-                const Icon = alert.icon;
-                return (
-                  <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl transition-colors hover:bg-white/[0.02]" style={{ border: "1px solid rgba(255,255,255,0.04)", background: "rgba(11, 18, 33, 0.4)" }}>
-                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${alert.color}15` }}>
-                      <Icon size={20} style={{ color: alert.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-semibold text-white mb-0.5">{alert.title}</p>
-                      <p className="text-[12px] text-[#82A0CE]">{alert.desc}</p>
-                    </div>
-                    <div className="flex items-center gap-6 mt-2 sm:mt-0">
-                      <span className="px-3 py-1 rounded-full text-[11px] font-medium border" 
-                        style={{ 
-                          color: alert.color, 
-                          borderColor: `${alert.color}40`,
-                          background: `${alert.color}10`
-                        }}>
-                        {alert.status}
-                      </span>
-                      <span className="text-[12px] text-[#5271A3] w-16 text-right">{alert.time}</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        )}
 
       </div>
     </div>

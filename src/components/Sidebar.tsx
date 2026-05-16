@@ -36,7 +36,6 @@ const navItems = [
   { href: "/batches",          label: "My Batches",           icon: Layers,          roles: ["Trainer"] },
   { href: "/attendance",       label: "Attendance Upload",    icon: ClipboardCheck,  roles: ["Trainer"] },
   { href: "/assessments",      label: "Assessment Upload",    icon: BookOpen,        roles: ["Trainer"] },
-  { href: "/files",            label: "Uploads / Documents",  icon: FolderSearch,    roles: ["Trainer"] },
   { href: "/analytics",        label: "Performance View",     icon: BarChart3,       roles: ["Trainer"] },
 ];
 

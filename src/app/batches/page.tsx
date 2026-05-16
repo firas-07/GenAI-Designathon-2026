@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import type { BatchStatus } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, onSnapshot } from "firebase/firestore";
-import { Plus, Search, Users, CheckCircle2, Calendar, CheckSquare, Activity } from "lucide-react";
+import { collection, addDoc, getDocs, query, orderBy, onSnapshot, where, deleteDoc, doc } from "firebase/firestore";
+import { Plus, Search, Users, CheckCircle2, Calendar, CheckSquare, Activity, Trash2 } from "lucide-react";
 
 const statusBadge = (s: BatchStatus) => {
   const map: Record<BatchStatus, string> = {
     Running: "badge-running",
-    Planned: "badge-planned",
     Completed: "badge-completed",
     Closed: "badge-closed"
   };
@@ -28,7 +27,13 @@ export default function BatchesPage() {
   
   // Form State
   const [newBatchName, setNewBatchName] = useState("");
-  const [newTrainer, setNewTrainer] = useState("Arjun Mehta");
+  const [trainers, setTrainers] = useState<any[]>([]);
+  const [newTrainer, setNewTrainer] = useState("");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState("2026-08-08");
+  const [capacity, setCapacity] = useState(25);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editBatchId, setEditBatchId] = useState("");
 
   // Real-time Data Subscriptions
   useEffect(() => {
@@ -63,6 +68,16 @@ export default function BatchesPage() {
       return () => unsubBatches();
     });
 
+    // Fetch trainers from users collection
+    const fetchTrainers = async () => {
+      const q = query(collection(db, "users"), where("role", "==", "Trainer"));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => d.data().name);
+      setTrainers(list);
+      if (list.length > 0) setNewTrainer(list[0]);
+    };
+    fetchTrainers();
+
     return () => unsubCands();
   }, [profile]);
 
@@ -82,40 +97,82 @@ export default function BatchesPage() {
 
   const [selectedBatch, setSelectedBatch] = useState<typeof displayBatches[0] | null>(null);
 
-  const handleCreateBatch = async () => {
+  const handleSaveBatch = async () => {
     if (!newBatchName) return showToast("Please enter a batch name", 'error');
     
     setIsSaving(true);
     try {
-      const newBatchData = {
-        batchId: `B26-${String(displayBatches.length + 1).padStart(3, '0')}`,
+      const batchData = {
         name: newBatchName,
-        status: "Running" as const,
-        trainer: profile?.role === "Trainer" ? profile.name : newTrainer,
-        avgAttendance: 0,
-        avgScore: 0,
-        enrolled: 0,
-        capacity: 25,
-        startDate: new Date().toISOString().split("T")[0],
-        endDate: "2026-08-08",
-        coordinator: profile?.name || "Admin",
-        createdAt: new Date().toISOString()
+        trainer: newTrainer,
+        capacity: Number(capacity),
+        startDate,
+        endDate,
+        updatedAt: new Date().toISOString()
       };
 
-      const docRef = await addDoc(collection(db, "batches"), newBatchData);
+      if (isEditing) {
+        const { updateDoc, doc } = await import("firebase/firestore");
+        await updateDoc(doc(db, "batches", editBatchId), batchData);
+        showToast("Batch updated successfully!");
+      } else {
+        const newBatchData = {
+          ...batchData,
+          batchId: `B26-${String(displayBatches.length + 1).padStart(3, '0')}`,
+          status: "Running" as const,
+          avgAttendance: 0,
+          avgScore: 0,
+          enrolled: 0,
+          coordinator: profile?.name || "Admin",
+          createdAt: new Date().toISOString()
+        };
+        await addDoc(collection(db, "batches"), newBatchData);
+        showToast("Batch created successfully!");
+      }
       
-      setDisplayBatches([{ id: docRef.id, ...newBatchData }, ...displayBatches]);
       setIsSaving(false);
       setShowCreateModal(false);
-      setNewBatchName("");
-      showToast("Batch created successfully and saved to Database!");
+      resetForm();
     } catch (error) {
-      console.error("Error adding batch:", error);
+      console.error("Error saving batch:", error);
       showToast("Failed to save to database", 'error');
       setIsSaving(false);
     }
   };
 
+  const resetForm = () => {
+    setNewBatchName("");
+    if (trainers.length > 0) setNewTrainer(trainers[0]);
+    setStartDate(new Date().toISOString().split("T")[0]);
+    setEndDate("2026-08-08");
+    setCapacity(25);
+    setIsEditing(false);
+    setEditBatchId("");
+  };
+
+  const openEditModal = (batch: any) => {
+    setNewBatchName(batch.name);
+    setNewTrainer(batch.trainer);
+    setStartDate(batch.startDate);
+    setEndDate(batch.endDate);
+    setCapacity(batch.capacity);
+    setEditBatchId(batch.id);
+    setIsEditing(true);
+    setShowCreateModal(true);
+    setSelectedBatch(null);
+  };
+
+  const handleDeleteBatch = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this batch? This action cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "batches", id));
+      setSelectedBatch(null);
+      showToast("Batch deleted successfully");
+    } catch (error) {
+      console.error("Error deleting batch:", error);
+      showToast("Failed to delete batch", "error");
+    }
+  };
 
 
   return (
@@ -205,10 +262,26 @@ export default function BatchesPage() {
               </div>
             </div>
 
-            <div className="p-8 border-t border-zinc-800 grid grid-cols-2 gap-4">
-              <button className="py-3 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all">Edit Batch</button>
-              <button className="py-3 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20">Send Batch Alert</button>
-            </div>
+            {profile?.role !== "Trainer" && (
+              <div className="p-8 border-t border-zinc-800 grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => openEditModal(selectedBatch)}
+                  className="py-3 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all"
+                >
+                  Edit Batch
+                </button>
+                {profile?.role === "Training Coordinator" ? (
+                  <button 
+                    onClick={() => handleDeleteBatch(selectedBatch.id)}
+                    className="py-3 rounded-xl bg-rose-600/10 border border-rose-500/20 text-rose-500 text-xs font-bold uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={14} /> Delete Batch
+                  </button>
+                ) : (
+                  <button className="py-3 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20">Send Batch Alert</button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -218,8 +291,6 @@ export default function BatchesPage() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto">
           <div className="glass-card p-8 w-full max-w-md border-white/[0.1] shadow-2xl animate-in fade-in duration-200 my-auto">
             <h3 className="text-xl font-bold text-white mb-2">Create New Training Batch</h3>
-            <p className="text-xs text-zinc-500 mb-6 uppercase tracking-widest font-bold">BRD Section 5.1 Compliance</p>
-            
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Batch Name</label>
@@ -233,20 +304,21 @@ export default function BatchesPage() {
               </div>
               {profile?.role !== "Trainer" ? (
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assigned Trainer</label>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assign Trainer</label>
                   <select 
                     value={newTrainer}
                     onChange={(e) => setNewTrainer(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500"
                   >
-                    <option>Arjun Mehta</option>
-                    <option>Sneha Rao</option>
-                    <option>Vikram Nair</option>
+                    {trainers.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                    {trainers.length === 0 && <option disabled>No trainers found</option>}
                   </select>
                 </div>
               ) : (
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assigned Trainer</label>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Assign Trainer</label>
                   <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-zinc-400">
                     {profile.name} (You)
                   </div>
@@ -255,20 +327,39 @@ export default function BatchesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Start Date</label>
-                  <input type="date" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" />
+                  <input 
+                    type="date" 
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" 
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">End Date</label>
-                  <input type="date" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" />
+                  <input 
+                    type="date" 
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" 
+                  />
                 </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1.5">Batch Capacity</label>
+                <input 
+                  type="number" 
+                  value={capacity}
+                  onChange={(e) => setCapacity(Number(e.target.value))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-teal-500" 
+                />
               </div>
             </div>
 
             <div className="flex gap-3 mt-8">
-              <button onClick={() => setShowCreateModal(false)} className="flex-1 py-3 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all">Cancel</button>
-              <button onClick={handleCreateBatch} disabled={isSaving} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20 flex items-center justify-center gap-2">
+              <button onClick={() => { setShowCreateModal(false); resetForm(); }} className="flex-1 py-3 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all">Cancel</button>
+              <button onClick={handleSaveBatch} disabled={isSaving} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20 flex items-center justify-center gap-2">
                 {isSaving && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                {isSaving ? "Creating..." : "Save Batch"}
+                {isSaving ? (isEditing ? "Updating..." : "Creating...") : (isEditing ? "Update Batch" : "Save Batch")}
               </button>
             </div>
           </div>
@@ -288,7 +379,7 @@ export default function BatchesPage() {
             />
           </div>
           <div className="flex items-center gap-2 bg-[#0B1221]/50 p-1 rounded-xl border border-white/[0.06]">
-            {["All", "Running", "Planned", "Completed", "Closed"].map((s) => (
+            {["All", "Running", "Completed", "Closed"].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
@@ -298,17 +389,18 @@ export default function BatchesPage() {
               </button>
             ))}
           </div>
-          <button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
-            style={{ background: "#3B82F6" }}>
-            <Plus size={18} /> Create Batch
-          </button>
+          {profile?.role === "Training Coordinator" && (
+            <button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-xl shadow-black/20 hover:scale-105 active:scale-95 transition-all"
+              style={{ background: "#3B82F6" }}>
+              <Plus size={18} /> Create Batch
+            </button>
+          )}
         </div>
         {/* Stats Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Total", value: displayBatches.length, color: "#3B82F6" },
             { label: "Running", value: displayBatches.filter(b => b.status === "Running").length, color: "#10b981" },
-            { label: "Planned", value: displayBatches.filter(b => b.status === "Planned").length, color: "#3b82f6" },
             { label: "Completed", value: displayBatches.filter(b => ["Completed","Closed"].includes(b.status)).length, color: "#60A5FA" },
           ].map(c => (
             <div key={c.label} className="glass-card p-4 flex items-center gap-4">

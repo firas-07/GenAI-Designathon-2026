@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy, addDoc, where, updateDoc, doc, onSnapshot } from "firebase/firestore";
@@ -86,34 +87,59 @@ export default function AssessmentsPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.endsWith('.csv')) return showToast("Please upload CSV format only", 'error');
+    
+    const isCSV = file.name.endsWith('.csv');
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+    if (!isCSV && !isExcel) {
+      return showToast("Please upload CSV or Excel format only", 'error');
+    }
 
     setIsSaving(true);
     
     const reader = new FileReader();
     reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      const rows = text.split('\n').filter(row => row.trim() !== '');
-      
-      const performanceRecords: any[] = [];
+      let performanceRecords: any[] = [];
       let lowPerformersCount = 0;
 
-      for (const row of rows.slice(1)) {
-        const columns = row.split(',').map(s => s.trim());
-        if (columns.length < 5) continue;
-
-        const name = columns[0];
-        const email = columns[1];
-        const codingScore = parseInt(columns[2]) || 0;
-        const apiScore = parseInt(columns[3]) || 0;
-        const projectScore = parseInt(columns[4]) || 0;
-        const avgScore = Math.round((codingScore + apiScore + projectScore) / 3);
-
-        performanceRecords.push({ name, email, codingScore, apiScore, projectScore, avgScore });
-        if (avgScore < 60) lowPerformersCount++;
-      }
-
       try {
+        if (isCSV) {
+          const text = event.target?.result as string;
+          const rows = text.split('\n').filter(row => row.trim() !== '');
+          for (const row of rows.slice(1)) {
+            const columns = row.split(',').map(s => s.trim());
+            if (columns.length < 5) continue;
+            const avgScore = Math.round((parseInt(columns[2]) + parseInt(columns[3]) + parseInt(columns[4])) / 3);
+            performanceRecords.push({ 
+              name: columns[0], 
+              email: columns[1], 
+              codingScore: parseInt(columns[2]) || 0, 
+              apiScore: parseInt(columns[3]) || 0, 
+              projectScore: parseInt(columns[4]) || 0, 
+              avgScore 
+            });
+          }
+        } else {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
+          
+          for (const row of jsonData.slice(1)) {
+            if (row.length < 5) continue;
+            const avgScore = Math.round((parseInt(row[2]) + parseInt(row[3]) + parseInt(row[4])) / 3);
+            performanceRecords.push({ 
+              name: row[0], 
+              email: row[1], 
+              codingScore: parseInt(row[2]) || 0, 
+              apiScore: parseInt(row[3]) || 0, 
+              projectScore: parseInt(row[4]) || 0, 
+              avgScore 
+            });
+          }
+        }
+
         await addDoc(collection(db, "assessment_logs"), {
           batch: selectedBatch,
           type: "Score Ingestion",
@@ -212,7 +238,11 @@ export default function AssessmentsPage() {
         setIsSaving(false);
       }
     };
-    reader.readAsText(file);
+    if (isCSV) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   };
 
   const topPerformers = [...displayCandidates].sort((a, b) => (b.avgScore || 0) - (a.avgScore || 0)).slice(0, 5);
@@ -278,55 +308,57 @@ export default function AssessmentsPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="glass-card p-6">
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-6">Upload Scores</p>
-            <div className="space-y-5">
-              <div className="flex gap-4 mb-8">
-                <div className="flex-1 flex flex-col">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
-                    Target Batch
-                  </label>
-                  <select
-                    value={selectedBatch}
-                    onChange={(e) => setSelectedBatch(e.target.value)}
-                    className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="">Select a batch...</option>
-                    {liveBatches.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
+          {profile?.role === "Trainer" && (
+            <div className="glass-card p-6">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-6">Upload Scores</p>
+              <div className="space-y-5">
+                <div className="flex gap-4 mb-8">
+                  <div className="flex-1 flex flex-col">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                      Target Batch
+                    </label>
+                    <select
+                      value={selectedBatch}
+                      onChange={(e) => setSelectedBatch(e.target.value)}
+                      className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select a batch...</option>
+                      {liveBatches.map(b => (
+                        <option key={b.id} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex-1 flex flex-col">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                      Week Reference
+                    </label>
+                    <input
+                      type="text"
+                      value={weekModule}
+                      onChange={(e) => setWeekModule(e.target.value)}
+                      placeholder="e.g. Week 1"
+                      className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-700"
+                    />
+                  </div>
                 </div>
 
-                <div className="flex-1 flex flex-col">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
-                    Week Reference
-                  </label>
-                  <input
-                    type="text"
-                    value={weekModule}
-                    onChange={(e) => setWeekModule(e.target.value)}
-                    placeholder="e.g. Week 1"
-                    className="h-11 w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-700"
-                  />
-                </div>
+                <input type="file" id="scoreUpload" hidden accept=".csv,.xlsx,.xls" onChange={handleFileUpload} />
+                <button onClick={() => document.getElementById('scoreUpload')?.click()} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ background: "#3B82F6", boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)" }}>
+                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Upload Scores CSV
+                </button>
               </div>
-
-              <input type="file" id="scoreUpload" hidden accept=".csv" onChange={handleFileUpload} />
-              <button onClick={() => document.getElementById('scoreUpload')?.click()} disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: "#3B82F6", boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)" }}>
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Upload Scores CSV
-              </button>
             </div>
-          </div>
+          )}
 
           <div className="glass-card p-6 flex flex-col h-full">
             <div className="flex items-center gap-2 mb-5">
               <TrendingUp size={18} className="text-teal-400" />
               <p className="text-base font-bold text-white uppercase tracking-wider text-xs">Score Distribution</p>
             </div>
-            <div className="flex-1 min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="flex-1 min-h-[200px]" style={{ minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <RadarChart data={radarData}>
                   <PolarGrid stroke="rgba(255,255,255,0.08)" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: "#82A0CE", fontSize: 11 }} />

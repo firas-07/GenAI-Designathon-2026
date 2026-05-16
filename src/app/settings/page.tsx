@@ -14,7 +14,7 @@ import { seedSystem, resetSystem, logActivity } from "@/lib/governance";
 
 export default function SystemSettings() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("training");
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -133,7 +133,6 @@ export default function SystemSettings() {
   };
 
   const tabs = [
-    { id: "general", label: "General", icon: Globe },
     { id: "training", label: "Training Rules", icon: Database },
     { id: "governance", label: "Data Management", icon: ShieldCheck, adminOnly: true },
     { id: "ai", label: "AI & Insights", icon: Cpu },
@@ -182,39 +181,7 @@ export default function SystemSettings() {
               <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
                 style={{ backgroundImage: "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
 
-              {activeTab === "general" && (
-                <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-2">General Configuration</h3>
-                    <p className="text-sm text-zinc-500 max-w-md">Customize the core identity and regional behavior of your platform instances.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Platform Identity</label>
-                      <div className="relative">
-                        <Globe size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" />
-                        <input 
-                          type="text" 
-                          defaultValue="Maverick Execution Platform"
-                          className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:bg-black/40 transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Corporate Domain</label>
-                      <div className="relative">
-                        <Mail size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" />
-                        <input 
-                          type="text" 
-                          defaultValue="maverick.com"
-                          className="w-full bg-black/20 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500/50 focus:bg-black/40 transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+
 
               {activeTab === "training" && (
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
@@ -451,7 +418,7 @@ export default function SystemSettings() {
               )}
 
               {/* Footer Actions */}
-              {(activeTab === "training" || activeTab === "general" || activeTab === "ai" || activeTab === "security" || activeTab === "notifications") && (
+              {(activeTab === "training" || activeTab === "ai" || activeTab === "security" || activeTab === "notifications") && (
                 <div className="mt-12 pt-6 border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {showSuccess && (
