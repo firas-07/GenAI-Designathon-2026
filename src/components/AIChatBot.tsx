@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { usePathname } from "next/navigation";
 import { Bot, Send, User, Sparkles, Loader2, X, MessageSquareText } from "lucide-react";
 
 interface Message {
@@ -13,7 +14,8 @@ interface Message {
 }
 
 export default function AIChatBot() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -23,58 +25,12 @@ export default function AIChatBot() {
       timestamp: new Date(),
     }
   ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [liveData, setLiveData] = useState({ 
-    highRisk: 0, 
-    totalCands: 0, 
-    batches: [] as any[],
-    avgAttendance: 0
-  });
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const fetchStats = async () => {
-      try {
-        const candSnap = await getDocs(collection(db, "candidates"));
-        const cands = candSnap.docs.map(d => d.data());
-        const highRisk = cands.filter(c => c.riskLevel === "HIGH" || c.risk === "HIGH").length;
-        
-        const batchSnap = await getDocs(collection(db, "batches"));
-        const batches = batchSnap.docs.map(d => d.data().name);
+  // Input and Loading states moved up
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-        const avgAtt = cands.length > 0 ? Math.round(cands.reduce((s, c) => s + (c.attendance || 0), 0) / cands.length) : 0;
-        
-        setLiveData({ highRisk, totalCands: cands.length, batches, avgAttendance: avgAtt });
-      } catch (e) { console.error(e); }
-    };
-    fetchStats();
-  }, [isOpen]);
-
-  const getMaverickResponse = (queryText: string) => {
-    const text = queryText.toLowerCase();
-    
-    if (text.includes("risk") || text.includes("high-risk")) {
-      if (liveData.totalCands === 0) return "The candidate database is currently empty. Please enroll talent to begin risk analysis.";
-      return `I have analyzed your **${liveData.totalCands} enrollees**. We currently have **${liveData.highRisk} candidates flagged as HIGH RISK**.\n\n**Common Indicators:**\n• Attendance below 75% threshold\n• Consecutive misses on the 10:00 AM cutoff\n• Decline in recent Coding Assessment scores.\n\nWould you like me to generate intervention notices for these candidates?`;
-    }
-
-    if (text.includes("batch") || text.includes("underperforming")) {
-      if (liveData.batches.length === 0) return "No active batches detected in the system.";
-      return `Currently, you are managing **${liveData.batches.length} batches**: ${liveData.batches.join(", ")}.\n\nBased on live performance logs, the **${liveData.batches[0]}** is showing the highest variance in attendance stability. I recommend a coordinator check-in to ensure compliance with training benchmarks.`;
-    }
-
-    if (text.includes("attendance")) {
-      return `Global attendance across all enrollees is holding at **${liveData.avgAttendance}%**. \n\n**Governance Observation:**\nWe've detected a trend where late logins (after 10:00 AM) are increasing on Thursdays. Suggest reinforcing the cutoff policy during the morning stand-ups.`;
-    }
-
-    if (text.includes("health") || text.includes("check")) {
-      return `**Platform Governance Health: OPTIMAL**\n\n• **Data Sync**: 100% active with Firestore\n• **Audit Trail**: Active and tracking all attendance marks\n• **Candidate Tracking**: ${liveData.totalCands} records synced\n• **AI Awareness**: Fully context-aware\n\nThe platform is ready for full-scale talent execution.`;
-    }
-
-    return `I've analyzed your query about *"${queryText}"*.\n\nMaverick is tracking **${liveData.totalCands} candidates** across **${liveData.batches.length} batches**. \n\nI can provide deep-dives into attendance trends, predicted dropout risks, or specific batch scorecards. What specific metric should we analyze?`;
-  };
 
   const renderMarkdown = (text: string) => {
     return text
@@ -91,17 +47,47 @@ export default function AIChatBot() {
     }
   }, [messages, isOpen]);
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: text, timestamp: new Date() };
-    setMessages(m => [...m, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setInput("");
     setLoading(true);
-    setTimeout(() => {
-      const resp: Message = { id: (Date.now() + 1).toString(), role: "assistant", content: getMaverickResponse(text), timestamp: new Date() };
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
+          userRole: profile?.role || "Guest",
+          currentPath: pathname
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      const resp: Message = { 
+        id: Date.now().toString(), 
+        role: "assistant", 
+        content: data.content || "I encountered an issue processing that. How else can I help?", 
+        timestamp: new Date() 
+      };
       setMessages(m => [...m, resp]);
+    } catch (error) {
+      console.error("AI Error:", error);
+      const errorMsg: Message = { 
+        id: Date.now().toString(), 
+        role: "assistant", 
+        content: "Sorry, I'm having trouble connecting to my brain right now. Please try again in a moment.", 
+        timestamp: new Date() 
+      };
+      setMessages(m => [...m, errorMsg]);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   if (!user) return null;

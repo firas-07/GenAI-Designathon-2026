@@ -172,6 +172,19 @@ export default function AssessmentsPage() {
             const finalProject = record.projectScore > 0 ? record.projectScore : (existing.projectScore || 0);
             const finalAvg = Math.round((finalCoding + finalApi + finalProject) / 3);
 
+            // Fetch REAL settings for risk
+            const settingsSnap = await getDoc(doc(db, "settings", "governance"));
+            const settings = settingsSnap.exists() ? settingsSnap.data() : { performanceThreshold: 70, attendanceRiskThreshold: 75 };
+            
+            const perfThreshold = settings.performanceThreshold || 70;
+            const attThreshold = settings.attendanceRiskThreshold || 75;
+
+            // Recalculate Risk based on updated Score AND current Attendance
+            const currentAttendance = existing.attendance || 0;
+            let newRisk = "LOW";
+            if (currentAttendance < (attThreshold - 15) || finalAvg < (perfThreshold - 20)) newRisk = "HIGH";
+            else if (currentAttendance < attThreshold || finalAvg < perfThreshold) newRisk = "MEDIUM";
+
             await updateDoc(doc(db, "candidates", candidateDoc.id), {
               name: record.name,
               avgScore: finalAvg,
@@ -179,7 +192,9 @@ export default function AssessmentsPage() {
               apiScore: finalApi,
               projectScore: finalProject,
               lastAssessment: weekModule,
-              batch: selectedBatch
+              batch: selectedBatch,
+              risk: newRisk,
+              status: newRisk === "HIGH" ? "AT RISK" : "ACTIVE"
             });
 
             await addDoc(collection(db, "assessment_snapshots"), {
@@ -195,6 +210,8 @@ export default function AssessmentsPage() {
               timestamp: new Date().toISOString()
             });
           } else {
+            const newRisk = record.avgScore < 50 ? "HIGH" : record.avgScore < 70 ? "MEDIUM" : "LOW";
+
             const newCandidateRef = await addDoc(collection(db, "candidates"), {
               email: record.email,
               name: record.name,
@@ -204,6 +221,9 @@ export default function AssessmentsPage() {
               apiScore: record.apiScore,
               projectScore: record.projectScore,
               lastAssessment: weekModule,
+              attendance: 100, // New candidates start at 100% attendance
+              risk: newRisk,
+              status: newRisk === "HIGH" ? "AT RISK" : "ACTIVE",
               createdAt: new Date().toISOString()
             });
 

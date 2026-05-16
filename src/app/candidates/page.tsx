@@ -21,6 +21,10 @@ export default function CandidatesPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newBatch, setNewBatch] = useState("");
   const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
+  const [candidateHistory, setCandidateHistory] = useState<any[]>([]);
+  const [parsedCandidates, setParsedCandidates] = useState<any[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   useEffect(() => {
     // Real-time Candidates
@@ -42,7 +46,25 @@ export default function CandidatesPage() {
       unsubCands();
       unsubBatches();
     };
-  }, [newBatch]); // Re-run if newBatch default logic is needed, though usually on mount is enough
+  }, [newBatch]);
+
+  useEffect(() => {
+    if (selectedCandidate) {
+      const q = query(
+        collection(db, "assessment_snapshots"), 
+        where("candidateEmail", "==", selectedCandidate.email)
+      );
+      const unsubHistory = onSnapshot(q, (snap) => {
+        const history = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort in memory to avoid needing a Firestore Composite Index
+        const sorted = history.sort((a: any, b: any) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setCandidateHistory(sorted);
+      });
+      return () => unsubHistory();
+    }
+  }, [selectedCandidate]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -54,12 +76,13 @@ export default function CandidatesPage() {
     setIsSaving(true);
     try {
       const newCandData = {
-        name: newName,
-        email: newEmail,
+        name: newName.trim(),
+        email: newEmail.trim().toLowerCase(),
         batch: newBatch,
-        attendance: 0,
+        attendance: 100,
         avgScore: 0,
         status: "ACTIVE",
+        risk: "LOW",
         createdAt: new Date().toISOString()
       };
       // 1. Enroll Candidate
@@ -92,84 +115,139 @@ export default function CandidatesPage() {
     if (!file) return;
 
     if (!file.name.endsWith('.csv')) {
-      return showToast("Please use .csv format only. Excel files must be 'Save As CSV'.", 'error');
+      return showToast("Please use .csv format only.", 'error');
     }
 
-    setIsSaving(true);
-    showToast("Parsing CSV and Enrolling Candidates...", 'success');
-
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const text = event.target?.result as string;
-      // Robust splitting for both Windows (\r\n) and Unix (\n) line endings
       const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
-      
-      // Skip the first line (header)
       const dataLines = lines.slice(1);
       
-      let count = 0;
-      const newCands: any[] = [];
-
-      try {
-        // Group by batch to minimize database calls
-        const batchCounts: Record<string, number> = {};
-
-        for (const line of dataLines) {
-          const columns = line.split(/[,\t;]/).map(s => s.trim().replace(/^["']|["']$/g, ""));
-          
-          if (columns.length >= 3) {
-            const [name, email, batch] = columns;
-            
-            // Basic validation: ensure email contains @ and all fields are present
-            if (name && email.includes("@") && batch) {
-              const candData = {
-                name, email, batch,
-                attendance: 100, avgScore: 0, status: "ACTIVE", risk: "LOW",
-                createdAt: new Date().toISOString()
-              };
-              await addDoc(collection(db, "candidates"), candData);
-              count++;
-              batchCounts[batch] = (batchCounts[batch] || 0) + 1;
-            }
+      const parsed = dataLines.map((line, index) => {
+        const columns = line.split(/[,\t;]/).map(s => s.trim().replace(/^["']|["']$/g, ""));
+        if (columns.length >= 3) {
+          const [name, email, batch] = columns;
+          if (name && email.includes("@") && batch) {
+            return { 
+              id: `temp-${index}`, 
+              name: name.trim(), 
+              email: email.trim().toLowerCase(), 
+              batch: batch.trim() 
+            };
           }
         }
+        return null;
+      }).filter(Boolean);
 
-        // Sync Batch Enrollment Counts
-        for (const [batchName, addCount] of Object.entries(batchCounts)) {
-          const bQ = query(collection(db, "batches"), where("name", "==", batchName));
-          const bSnap = await getDocs(bQ);
-          if (!bSnap.empty) {
-            await updateDoc(doc(db, "batches", bSnap.docs[0].id), {
-              enrolled: increment(addCount)
-            });
-          }
-        }
-
-        // Governance: Log this upload to the Monitoring system
-        await addDoc(collection(db, "file_logs"), {
-          name: file.name,
-          type: "Candidates",
-          status: count > 0 ? "Success" : "Partial",
-          uploader: profile?.name || "Admin",
-          records: count,
-          batch: "Bulk Ingestion",
-          timestamp: new Date().toISOString()
-        });
-
-        setDisplayCandidates(prev => [...newCands, ...prev]);
-        setIsSaving(false);
-        if (count > 0) {
-          showToast(`Successfully enrolled ${count} candidates!`);
-        } else {
-          showToast("No valid records found. Check your CSV format.", "error");
-        }
-      } catch (err) {
-        console.error(err);
-        showToast("Error processing file", "error");
-        setIsSaving(false);
+      if (parsed.length > 0) {
+        setParsedCandidates(parsed);
+        setShowPreviewModal(true);
+      } else {
+        showToast("No valid records found in CSV", "error");
       }
     };
     reader.readAsText(file);
+    e.target.value = ""; // Reset input
+  };
+
+  const handleBulkEnroll = async () => {
+    setIsBulkSaving(true);
+    showToast("Enrolling candidates...", "success");
+
+    try {
+      const batchCounts: Record<string, number> = {};
+      
+      for (const cand of parsedCandidates) {
+        const candData = {
+          name: cand.name,
+          email: cand.email,
+          batch: cand.batch,
+          attendance: 100,
+          avgScore: 0,
+          status: "ACTIVE",
+          risk: "LOW",
+          createdAt: new Date().toISOString()
+        };
+        await addDoc(collection(db, "candidates"), candData);
+        batchCounts[cand.batch] = (batchCounts[cand.batch] || 0) + 1;
+      }
+
+      // Sync Batch Enrollment Counts
+      for (const [batchName, addCount] of Object.entries(batchCounts)) {
+        const bQ = query(collection(db, "batches"), where("name", "==", batchName));
+        const bSnap = await getDocs(bQ);
+        if (!bSnap.empty) {
+          await updateDoc(doc(db, "batches", bSnap.docs[0].id), {
+            enrolled: increment(addCount)
+          });
+        }
+      }
+
+      await addDoc(collection(db, "file_logs"), {
+        name: "Bulk Upload",
+        type: "Candidates",
+        status: "Success",
+        uploader: profile?.name || "Admin",
+        records: parsedCandidates.length,
+        batch: "Bulk Ingestion",
+        timestamp: new Date().toISOString()
+      });
+
+      showToast(`Successfully enrolled ${parsedCandidates.length} candidates!`);
+      setShowPreviewModal(false);
+      setParsedCandidates([]);
+    } catch (err) {
+      console.error(err);
+      showToast("Error saving candidates", "error");
+    } finally {
+      setIsBulkSaving(false);
+    }
+  };
+
+  const removeFromPreview = (id: string) => {
+    setParsedCandidates(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleDiscontinueCandidate = async (candidate: any) => {
+    if (!window.confirm(`Are you sure you want to DISCONTINUE ${candidate.name}? This is a permanent administrative action.`)) return;
+    
+    setIsSaving(true);
+    try {
+      const id = candidate.id;
+      // 1. Update Candidate Status
+      await updateDoc(doc(db, "candidates", id), {
+        status: "DISCONTINUED",
+        risk: "LOW",
+        updatedAt: new Date().toISOString()
+      });
+
+      // 2. Decrement Batch Enrollment (They are no longer "In" the batch)
+      const bQ = query(collection(db, "batches"), where("name", "==", candidate.batch));
+      const bSnap = await getDocs(bQ);
+      if (!bSnap.empty) {
+        await updateDoc(doc(db, "batches", bSnap.docs[0].id), {
+          enrolled: increment(-1)
+        });
+      }
+
+      // 3. Log to Audit
+      await addDoc(collection(db, "audit_logs"), {
+        action: "Candidate Discontinued",
+        details: `${candidate.name} (${candidate.email}) has been marked as discontinued from ${candidate.batch}.`,
+        user: profile?.name || "Coordinator",
+        category: "Governance",
+        timestamp: new Date().toISOString()
+      });
+
+      showToast(`${candidate.name} marked as discontinued.`);
+      setSelectedCandidate(prev => prev ? { ...prev, status: "DISCONTINUED" } : null);
+      setIsSaving(false);
+    } catch (error) {
+      console.error("Discontinue Error:", error);
+      showToast("Error updating status", 'error');
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteCandidate = async (candidate: any) => {
@@ -261,6 +339,75 @@ export default function CandidatesPage() {
         </div>
       )}
 
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="glass-card w-full max-w-4xl max-h-[80vh] flex flex-col border-white/[0.1] shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Review Enrollment List</h3>
+                <p className="text-xs text-zinc-500 mt-1">Found {parsedCandidates.length} valid candidates in CSV</p>
+              </div>
+              <button onClick={() => setShowPreviewModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                    <th className="pb-3 px-2">Name</th>
+                    <th className="pb-3 px-2">Email</th>
+                    <th className="pb-3 px-2">Target Batch</th>
+                    <th className="pb-3 px-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {parsedCandidates.map((c) => (
+                    <tr key={c.id} className="border-b border-white/[0.03] group hover:bg-white/[0.02]">
+                      <td className="py-3 px-2 text-white font-medium">{c.name}</td>
+                      <td className="py-3 px-2 text-zinc-400">{c.email}</td>
+                      <td className="py-3 px-2">
+                        <span className="px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-400 text-[10px] font-bold">{c.batch}</span>
+                      </td>
+                      <td className="py-3 px-2 text-right">
+                        <button onClick={() => removeFromPreview(c.id)} className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all">
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-6 border-t border-white/5 bg-white/[0.02] flex justify-end gap-3">
+              <button 
+                onClick={() => setShowPreviewModal(false)} 
+                className="px-6 py-2.5 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all"
+              >
+                Discard
+              </button>
+              <button 
+                onClick={handleBulkEnroll} 
+                disabled={isBulkSaving}
+                className="px-8 py-2.5 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg flex items-center gap-2"
+              >
+                {isBulkSaving ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Enrolling...
+                  </>
+                ) : (
+                  <>Finalize & Enroll All</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Candidate Deep-Dive Slide-over */}
       {selectedCandidate && (
         <div className="fixed inset-0 z-[10000] flex justify-end">
@@ -322,19 +469,19 @@ export default function CandidatesPage() {
                   <Calendar size={16} className="text-teal-400" /> Recent Assessments
                 </h4>
                 <div className="space-y-4">
-                  {[
-                    { name: "Frontend Fundamentals", score: 82, date: "2 days ago" },
-                    { name: "React State Management", score: 45, date: "1 week ago" },
-                    { name: "Database Design", score: 70, date: "2 weeks ago" }
-                  ].map((a, i) => (
+                  {candidateHistory.length > 0 ? candidateHistory.map((a, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-zinc-800/30 border border-white/5">
                       <div>
-                        <p className="text-xs font-bold text-white">{a.name}</p>
-                        <p className="text-[10px] text-zinc-500">{a.date}</p>
+                        <p className="text-xs font-bold text-white">{a.week || "Assessment"}</p>
+                        <p className="text-[10px] text-zinc-500">{new Date(a.timestamp).toLocaleDateString()}</p>
                       </div>
-                      <span className={`text-xs font-bold ${a.score >= 70 ? 'text-emerald-400' : 'text-rose-400'}`}>{a.score}%</span>
+                      <span className={`text-xs font-bold ${a.avgScore >= 70 ? 'text-emerald-400' : 'text-rose-400'}`}>{a.avgScore}%</span>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="py-8 text-center border border-dashed border-white/10 rounded-xl">
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">No Data Logged Yet</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -344,14 +491,41 @@ export default function CandidatesPage() {
                   <Activity size={16} /> Maverick AI Insight
                 </h4>
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Candidate is showing strong performance in theoretical modules but struggling with practical state management. Suggest pairing with a Peer Mentor for the upcoming Project Phase.
+                  {selectedCandidate.attendance < 75 
+                    ? `Warning: Attendance is currently ${selectedCandidate.attendance}%. High risk of disengagement. Immediate intervention required.`
+                    : selectedCandidate.avgScore < 60 
+                    ? `Candidate is showing strong attendance but struggling with assessments (${selectedCandidate.avgScore}%). Recommend personalized coaching.`
+                    : `Excellent performance! With ${selectedCandidate.attendance}% attendance and ${selectedCandidate.avgScore}% scores, this candidate is a top performer.`}
                 </p>
               </div>
 
               {/* Quick Actions */}
-              <div className="flex gap-3">
-                <button className="flex-1 py-3.5 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20">Send Performance Alert</button>
-                <button className="flex-1 py-3.5 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all">Download Report</button>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <button className="flex-1 py-3.5 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-lg shadow-black/20">Send Performance Alert</button>
+                  <button className="flex-1 py-3.5 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-zinc-800 transition-all">Download Report</button>
+                </div>
+                
+                {profile?.role !== "Trainer" && selectedCandidate.status !== "DISCONTINUED" && (
+                  <button 
+                    onClick={() => handleDiscontinueCandidate(selectedCandidate)}
+                    className="w-full py-3.5 rounded-xl bg-rose-600/10 border border-rose-500/20 text-rose-500 text-xs font-bold uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    Mark as Discontinued
+                  </button>
+                )}
+
+                {profile?.role === "Training Coordinator" && (
+                  <button 
+                    onClick={() => {
+                      handleDeleteCandidate(selectedCandidate);
+                      setSelectedCandidate(null);
+                    }}
+                    className="w-full py-3.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 text-xs font-bold uppercase tracking-widest hover:bg-zinc-800 hover:text-rose-500 transition-all flex items-center justify-center gap-2"
+                  >
+                    Delete Forever
+                  </button>
+                )}
               </div>
             </div>
           </div>

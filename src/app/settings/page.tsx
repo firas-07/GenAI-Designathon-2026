@@ -18,12 +18,20 @@ export default function SystemSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
-
-  // Governance State
+  // Core Governance (BRD 5.2)
   const [attendanceCutoff, setAttendanceCutoff] = useState("10:00");
   const [attendanceRiskThreshold, setAttendanceRiskThreshold] = useState(75);
   const [performanceThreshold, setPerformanceThreshold] = useState(70);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Topper Weightages (BRD 5.8)
+  const [sprintWeight, setSprintWeight] = useState(20);
+  const [apiWeight, setApiWeight] = useState(20);
+  const [codingWeight, setCodingWeight] = useState(30);
+  const [projectWeight, setProjectWeight] = useState(30);
+
+  // Advanced Rules (BRD 5.2)
+  const [consecutiveAbsenceAlert, setConsecutiveAbsenceAlert] = useState(true);
 
   // AI & Insights State
   const [aiPersona, setAiPersona] = useState("Analytical");
@@ -52,6 +60,13 @@ export default function SystemSettings() {
           setSessionTimeout(data.sessionTimeout || "4h");
           setEmailAlerts(data.emailAlerts ?? true);
           setRiskAlerts(data.riskAlerts ?? true);
+          
+          // Topper Weights
+          setSprintWeight(data.sprintWeight || 20);
+          setApiWeight(data.apiWeight || 20);
+          setCodingWeight(data.codingWeight || 30);
+          setProjectWeight(data.projectWeight || 30);
+          setConsecutiveAbsenceAlert(data.consecutiveAbsenceAlert ?? true);
         }
       } catch (err) {
         console.error("Error fetching settings:", err);
@@ -59,6 +74,50 @@ export default function SystemSettings() {
     };
     fetchSettings();
   }, []);
+
+  const handleRunAudit = async () => {
+    setIsProcessing(true);
+    try {
+      // Fetch running batches
+      const { collection, getDocs, query, where, addDoc } = await import("firebase/firestore");
+      const batchSnap = await getDocs(query(collection(db, "batches"), where("status", "==", "Running")));
+      const batches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceSnap = await getDocs(query(collection(db, "attendance_snapshots"), where("date", "==", today)));
+      const loggedBatchIds = new Set(attendanceSnap.docs.map(d => d.data().batchId));
+      
+      let missedCount = 0;
+      for (const batch of batches as any) {
+        if (!loggedBatchIds.has(batch.id)) {
+          // Trigger Alert (BRD 5.2)
+          await addDoc(collection(db, "system_alerts"), {
+            title: `Missed Attendance: ${batch.name}`,
+            severity: "high",
+            message: `Trainer ${batch.trainer} failed to upload attendance by the ${attendanceCutoff} cutoff.`,
+            type: "compliance",
+            status: "Active",
+            timestamp: new Date().toISOString()
+          });
+          missedCount++;
+        }
+      }
+      
+      await logActivity(
+        "Compliance",
+        `Manual compliance audit executed. Found ${missedCount} batches with missing attendance logs.`,
+        profile?.name || "Admin"
+      );
+      
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      console.error("Audit error:", err);
+      setError("Failed to run compliance audit");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -74,6 +133,11 @@ export default function SystemSettings() {
         sessionTimeout,
         emailAlerts,
         riskAlerts,
+        sprintWeight,
+        apiWeight,
+        codingWeight,
+        projectWeight,
+        consecutiveAbsenceAlert,
         lastUpdated: new Date().toISOString(),
         updatedBy: profile?.name || "Admin"
       });
@@ -183,7 +247,7 @@ export default function SystemSettings() {
 
 
 
-              {activeTab === "training" && (
+              {activeTab === "training" && 
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">Training Rules</h3>
@@ -233,13 +297,58 @@ export default function SystemSettings() {
                             />
                           </div>
                         </div>
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-black/20 border border-white/5 md:col-span-2">
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-white">3-Day Consecutive Absence Alert</p>
+                            <p className="text-[11px] text-zinc-500">Automatically alert the coordinator if a student is absent for 3 days in a row.</p>
+                          </div>
+                          <button 
+                            onClick={() => setConsecutiveAbsenceAlert(!consecutiveAbsenceAlert)}
+                            className={cn("w-12 h-6 rounded-full transition-all relative p-1", consecutiveAbsenceAlert ? "bg-blue-600" : "bg-zinc-700")}
+                          >
+                            <div className={cn("w-4 h-4 rounded-full bg-white transition-all shadow-sm", consecutiveAbsenceAlert ? "translate-x-6" : "translate-x-0")} />
+                          </button>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Topper Weightages (BRD 5.8) */}
+                    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] space-y-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-amber-600/10 flex items-center justify-center border border-amber-600/20">
+                          <Activity size={18} className="text-amber-400" />
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-white block">Topper Criteria Weightages</span>
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">BRD Section 5.8 Compliance</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                          { label: "Sprint Weight", val: sprintWeight, set: setSprintWeight },
+                          { label: "API Weight", val: apiWeight, set: setApiWeight },
+                          { label: "Coding Weight", val: codingWeight, set: setCodingWeight },
+                          { label: "Project Weight", val: projectWeight, set: setProjectWeight },
+                        ].map((w) => (
+                          <div key={w.label} className="space-y-2">
+                            <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block ml-1">{w.label} (%)</label>
+                            <input 
+                              type="number" 
+                              value={w.val} 
+                              onChange={(e) => w.set(Number(e.target.value))}
+                              className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-amber-500/50"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-zinc-600 italic">Weights should ideally total 100% for balanced merit identification.</p>
                     </div>
                   </div>
                 </div>
-              )}
+              }
 
-              {activeTab === "governance" && (
+              {activeTab === "governance" && 
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">Data Governance Power Tools</h3>
@@ -262,6 +371,21 @@ export default function SystemSettings() {
                       </button>
                     </div>
 
+                    <div className="p-6 rounded-2xl border border-amber-500/10 bg-amber-500/5 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <ShieldAlert size={20} className="text-amber-400" />
+                        <h4 className="text-sm font-bold text-white">Compliance Drill</h4>
+                      </div>
+                      <p className="text-xs text-zinc-400">Simulate the 10:01 AM system scan. Identifies batches with missing attendance and triggers coordinator alerts.</p>
+                      <button 
+                        onClick={handleRunAudit}
+                        disabled={isProcessing}
+                        className="w-full py-3 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-amber-500 transition-all disabled:opacity-50"
+                      >
+                        {isProcessing ? "Scanning..." : "Run Compliance Audit"}
+                      </button>
+                    </div>
+
                     <div className="p-6 rounded-2xl border border-rose-500/10 bg-rose-500/5 space-y-4">
                       <div className="flex items-center gap-3">
                         <Trash2 size={20} className="text-rose-400" />
@@ -278,9 +402,9 @@ export default function SystemSettings() {
                     </div>
                   </div>
                 </div>
-              )}
+              }
 
-              {activeTab === "ai" && (
+              {activeTab === "ai" && 
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">AI Intelligence Engine</h3>
@@ -329,9 +453,9 @@ export default function SystemSettings() {
                     </div>
                   </div>
                 </div>
-              )}
+              }
 
-              {activeTab === "security" && (
+              {activeTab === "security" && 
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">Security & Access Policy</h3>
@@ -372,9 +496,9 @@ export default function SystemSettings() {
                     </div>
                   </div>
                 </div>
-              )}
+              }
 
-              {activeTab === "notifications" && (
+              {activeTab === "notifications" && 
                 <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div>
                     <h3 className="text-xl font-semibold text-white mb-2">Automated Notifications</h3>
@@ -415,10 +539,10 @@ export default function SystemSettings() {
                     </div>
                   </div>
                 </div>
-              )}
+              }
 
               {/* Footer Actions */}
-              {(activeTab === "training" || activeTab === "ai" || activeTab === "security" || activeTab === "notifications") && (
+              {(activeTab === "training" || activeTab === "ai" || activeTab === "security" || activeTab === "notifications") && 
                 <div className="mt-12 pt-6 border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {showSuccess && (
@@ -448,7 +572,7 @@ export default function SystemSettings() {
                     </button>
                   </div>
                 </div>
-              )}
+              }
 
             </div>
           </div>

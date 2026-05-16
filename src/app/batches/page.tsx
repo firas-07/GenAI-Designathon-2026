@@ -4,14 +4,16 @@ import { useState, useEffect } from "react";
 import type { BatchStatus } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy, onSnapshot, where, deleteDoc, doc } from "firebase/firestore";
-import { Plus, Search, Users, CheckCircle2, Calendar, CheckSquare, Activity, Trash2 } from "lucide-react";
+import { logActivity } from "@/lib/governance";
+import { collection, addDoc, getDocs, query, orderBy, onSnapshot, where, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { Plus, Search, Users, CheckCircle2, Calendar, CheckSquare, Activity, Trash2, Bell } from "lucide-react";
 
 const statusBadge = (s: BatchStatus) => {
   const map: Record<BatchStatus, string> = {
     Running: "badge-running",
     Completed: "badge-completed",
-    Closed: "badge-closed"
+    Closed: "badge-closed",
+    Planned: "badge-planned"
   };
   return map[s] || "badge-closed";
 };
@@ -35,13 +37,36 @@ export default function BatchesPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editBatchId, setEditBatchId] = useState("");
 
+  const [weights, setWeights] = useState({ sprint: 20, api: 20, coding: 30, project: 30 });
+
   // Real-time Data Subscriptions
   useEffect(() => {
+    // Fetch Weights
+    getDoc(doc(db, "settings", "governance")).then(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setWeights({
+          sprint: d.sprintWeight || 20,
+          api: d.apiWeight || 20,
+          coding: d.codingWeight || 30,
+          project: d.projectWeight || 30
+        });
+      }
+    });
+
     // We need both candidates and batches to calculate live enrollment counts and averages
     const unsubCands = onSnapshot(collection(db, "candidates"), (candSnap) => {
       const allCands = candSnap.docs.map(d => d.data());
       
-      const unsubBatches = onSnapshot(query(collection(db, "batches"), orderBy("createdAt", "desc")), (batchSnap) => {
+      let batchesQuery = query(collection(db, "batches"), orderBy("createdAt", "desc"));
+      
+      // RBAC Filter (BRD 4.1)
+      if (profile?.role === "Trainer") {
+        const { where } = require("firebase/firestore");
+        batchesQuery = query(collection(db, "batches"), where("trainer", "==", profile.name), orderBy("createdAt", "desc"));
+      }
+
+      const unsubBatches = onSnapshot(batchesQuery, (batchSnap) => {
         const firestoreBatches = batchSnap.docs.map(doc => {
           const data = doc.data();
           const batchCands = allCands.filter((c: any) => c.batch === data.name);
@@ -50,8 +75,19 @@ export default function BatchesPage() {
           const avgAttendance = actualCount > 0 
             ? Math.round(batchCands.reduce((acc: number, c: any) => acc + (c.attendance || 0), 0) / actualCount)
             : 0;
+          
+          // Weighted Average Score (BRD 5.8)
           const avgScore = actualCount > 0 
-            ? Math.round(batchCands.reduce((acc: number, c: any) => acc + (c.avgScore || 0), 0) / actualCount)
+            ? Math.round(batchCands.reduce((acc: number, c: any) => {
+                const s = c.scores || {};
+                const weighted = (
+                  ((s.sprint || 0) * weights.sprint) +
+                  ((s.api || 0) * weights.api) +
+                  ((s.coding || 0) * weights.coding) +
+                  ((s.project || 0) * weights.project)
+                ) / 100;
+                return acc + (weighted || c.avgScore || 0);
+              }, 0) / actualCount)
             : 0;
           
           return { 
@@ -162,6 +198,73 @@ export default function BatchesPage() {
     setSelectedBatch(null);
   };
 
+  const handleTriggerFeedback = async (batchId: string, batchName: string) => {
+    try {
+      const { updateDoc, doc } = await import("firebase/firestore");
+      await updateDoc(doc(db, "batches", batchId), {
+        feedbackStatus: "Active",
+        feedbackTriggeredAt: new Date().toISOString()
+      });
+      
+      await logActivity({
+        action: "Communication",
+        category: "Governance",
+        details: `[FEEDBACK TRIGGERED] Survey launched for ${batchName}. Students notified via automated email channel.`,
+        user: profile?.name || "Coordinator"
+      });
+      
+      showToast(`Feedback collection started for ${batchName}!`);
+    } catch (err) {
+      console.error("Feedback error:", err);
+      showToast("Failed to initiate feedback", "error");
+    }
+  };
+
+  const handleGraduateBatch = async (batchId: string, batchName: string) => {
+    if (!confirm(`Are you sure you want to GRADUATE ${batchName}? This will mark all candidates as completed and lock the batch.`)) return;
+    
+    setIsSaving(true);
+    try {
+      const { updateDoc, doc, collection, query, where, getDocs, addDoc } = await import("firebase/firestore");
+      
+      // 1. Update Batch Status
+      await updateDoc(doc(db, "batches", batchId), {
+        status: "Completed",
+        updatedAt: new Date().toISOString()
+      });
+
+      // 2. Graduate all candidates in this batch
+      const q = query(collection(db, "candidates"), where("batch", "==", batchName));
+      const snap = await getDocs(q);
+      
+      const promises = snap.docs.map(d => 
+        updateDoc(doc(db, "candidates", d.id), {
+          status: "COMPLETED",
+          risk: "LOW",
+          updatedAt: new Date().toISOString()
+        })
+      );
+      await Promise.all(promises);
+
+      // 3. Log to Audit (BRD 5.1 & 5.6)
+      await logActivity({
+        action: "Batch Graduated",
+        category: "Governance",
+        details: `Batch ${batchName} successfully completed. ${snap.size} candidates graduated and moved to alumni status.`,
+        user: profile?.name || "Coordinator"
+      });
+
+      showToast(`Batch ${batchName} graduated successfully!`);
+      setSelectedBatch(prev => prev ? { ...prev, status: "Completed" } : null);
+      setIsSaving(false);
+    } catch (error) {
+      console.error("Error graduating batch:", error);
+      showToast("Failed to graduate batch", "error");
+      setIsSaving(false);
+    }
+  };
+
+
   const handleDeleteBatch = async (id: string) => {
     if (!confirm("Are you sure you want to delete this batch? This action cannot be undone.")) return;
     try {
@@ -202,9 +305,28 @@ export default function BatchesPage() {
                 <h2 className="text-2xl font-bold text-white">{selectedBatch.name}</h2>
                 <p className="text-xs text-teal-400 font-bold uppercase tracking-widest mt-1">{selectedBatch.id} • {selectedBatch.status}</p>
               </div>
-              <button onClick={() => setSelectedBatch(null)} className="w-10 h-10 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-400 transition-colors">
-                <Plus size={24} className="rotate-45" />
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedBatch.status === "Running" && profile?.role !== "Trainer" && (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleTriggerFeedback(selectedBatch.id, selectedBatch.name)}
+                      className="px-4 py-2 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all flex items-center gap-2"
+                    >
+                      <Bell size={14} /> Launch Feedback
+                    </button>
+                    <button 
+                      onClick={() => handleGraduateBatch(selectedBatch.id, selectedBatch.name)}
+                      disabled={isSaving}
+                      className="px-4 py-2 rounded-xl bg-teal-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-teal-400 shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
+                    >
+                      <CheckCircle2 size={14} /> Graduate Batch
+                    </button>
+                  </div>
+                )}
+                <button onClick={() => setSelectedBatch(null)} className="w-10 h-10 rounded-full hover:bg-zinc-800 flex items-center justify-center text-zinc-400 transition-colors">
+                  <Plus size={24} className="rotate-45" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8">

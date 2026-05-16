@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, limit, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, limit, orderBy, onSnapshot, getDocs, getDoc, doc, setDoc } from "firebase/firestore";
 
 const MetricCard = ({
   label, value, icon: Icon, color, trendVal, trendColor
@@ -100,19 +100,30 @@ export default function Dashboard() {
       setBatchData(batchComparison);
     });
 
-    const unsubAlerts = onSnapshot(query(collection(db, "system_alerts"), orderBy("timestamp", "desc"), limit(3)), (snap) => {
-      const alerts = snap.docs.map(doc => {
-        const data = doc.data();
+    const unsubAlerts = onSnapshot(collection(db, "system_alerts"), (snap) => {
+      const allAlerts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort in memory to handle different field names (timestamp vs createdAt)
+      const sorted = allAlerts.sort((a: any, b: any) => {
+        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : new Date(a.timestamp || a.createdAt || 0).getTime();
+        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : new Date(b.timestamp || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      }).slice(0, 5);
+
+      const mapped = sorted.map((data: any) => {
+        const severity = (data.severity || "medium").toLowerCase();
+        const isHigh = severity === "critical" || severity === "high";
+        
         return {
           title: data.title || "System Alert",
-          desc: data.description || data.message || "No description available.",
-          status: data.severity || "Medium",
-          time: "Live",
-          icon: data.severity === "Critical" ? ShieldAlert : AlertTriangle,
-          color: data.severity === "Critical" ? "#EF4444" : "#F59E0B"
+          desc: data.message || data.description || "No description available.",
+          status: severity.toUpperCase(),
+          time: data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+          icon: isHigh ? ShieldAlert : AlertTriangle,
+          color: isHigh ? "#EF4444" : (severity === "medium" ? "#F59E0B" : "#3B82F6")
         };
       });
-      setRecentAlerts(alerts);
+      setRecentAlerts(mapped);
       setStats(prev => ({ ...prev, alerts: snap.size.toString() }));
       setLoading(false);
     });
@@ -120,6 +131,54 @@ export default function Dashboard() {
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setStats(prev => ({ ...prev, totalUsers: snap.size.toLocaleString() }));
     });
+
+    // 2. PROACTIVE AI SCANNER (Auto-triggers Alerts)
+    const runAutoSentry = async () => {
+      try {
+        const candsSnap = await getDocs(query(collection(db, "candidates")));
+        const cands = candsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        
+        if (cands.length === 0) return;
+
+        // A. Identify Topper
+        const topper = [...cands].sort((a,b) => (b.avgScore || 0) - (a.avgScore || 0))[0];
+        if (topper && topper.avgScore >= 90) {
+          const alertId = `topper-${topper.id}-${new Date().toLocaleDateString().replace(/\//g, '-')}`;
+          const alertRef = doc(db, "system_alerts", alertId);
+          const alertSnap = await getDoc(alertRef);
+          
+          if (!alertSnap.exists()) {
+            await setDoc(alertRef, {
+              title: "AI Merit Recognition",
+              message: `Maverick AI has identified ${topper.name} as the Batch Topper with a stellar score of ${topper.avgScore}%!`,
+              severity: "low",
+              type: "merit",
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+
+        // B. Identify High Risk (Auto-trigger)
+        const highRiskCands = cands.filter(c => c.risk === "HIGH");
+        for (const rc of highRiskCands) {
+          const alertId = `risk-${rc.id}-${new Date().toLocaleDateString().replace(/\//g, '-')}`;
+          const alertRef = doc(db, "system_alerts", alertId);
+          const alertSnap = await getDoc(alertRef);
+
+          if (!alertSnap.exists()) {
+            await setDoc(alertRef, {
+              title: "Urgent Governance Alert",
+              message: `AI Detection: ${rc.name} in ${rc.batch} has breached risk thresholds. Immediate intervention required.`,
+              severity: "high",
+              type: "risk",
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (err) { console.error("AutoSentry Error:", err); }
+    };
+
+    runAutoSentry();
 
     return () => {
       unsubCands();

@@ -1,10 +1,10 @@
 "use client";
 import Header from "@/components/Header";
 import { useState, useEffect } from "react";
-import * as XLSX from "xlsx";
+import { read, utils, set_fs } from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { Upload, AlertCircle, CheckCircle2, Clock, Loader2, X, UserCheck } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,9 @@ export default function AttendancePage() {
   const [manualStudents, setManualStudents] = useState<any[]>([]);
   const [liveAttendanceTrend, setLiveAttendanceTrend] = useState<any[]>([]);
   const [lowAttendanceList, setLowAttendanceList] = useState<any[]>([]);
+  const [parsedAttendance, setParsedAttendance] = useState<any[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   // Real-time Data Subscriptions
   useEffect(() => {
@@ -124,98 +127,120 @@ export default function AttendancePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isCSV = file.name.endsWith('.csv');
-    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-
-    if (!isCSV && !isExcel) {
-      return showToast("Please upload CSV or Excel format only", 'error');
+    if (!file.name.endsWith('.csv')) {
+      return showToast("Please use .csv format only.", 'error');
     }
 
     if (!selectedBatch) {
       return showToast("Please select a batch first", 'error');
     }
 
-    setIsSaving(true);
-    
     const reader = new FileReader();
     reader.onload = async (event) => {
-      let present = 0;
-      let absent = 0;
-      let recordsCount = 0;
-
-      try {
-        if (isCSV) {
-          const text = event.target?.result as string;
-          const rows = text.split('\n').filter(row => row.trim() !== '');
-          recordsCount = rows.length - 1;
-          rows.slice(1).forEach(row => {
-            const columns = row.split(',');
-            const status = columns[2]?.trim().toUpperCase(); 
-            if (status === 'PRESENT') present++;
-            else if (status === 'ABSENT' || status === 'LATE') absent++;
-          });
-        } else {
-          const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[];
-          recordsCount = jsonData.length - 1;
-          jsonData.slice(1).forEach(row => {
-            const status = row[2]?.toString().trim().toUpperCase();
-            if (status === 'PRESENT') present++;
-            else if (status === 'ABSENT' || status === 'LATE') absent++;
-          });
+      const text = event.target?.result as string;
+      const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+      const dataRows = rows.slice(1);
+      
+      const parsed = dataRows.map((row, index) => {
+        const columns = row.split(',').map(s => s.trim().replace(/^["']|["']$/g, ""));
+        if (columns.length >= 3) {
+          const [name, email, status] = columns;
+          return { 
+            id: `temp-${index}`, 
+            name: name.trim(), 
+            email: email.trim().toLowerCase(), 
+            status: status.toUpperCase() === 'PRESENT' ? 'PRESENT' : 'ABSENT' 
+          };
         }
+        return null;
+      }).filter(Boolean);
 
-        const now = new Date();
-        const [cutoffHour, cutoffMin] = cutoffTime.split(":").map(Number);
-        const isLate = now.getHours() > cutoffHour || (now.getHours() === cutoffHour && now.getMinutes() > cutoffMin);
-
-        await addDoc(collection(db, "attendance_logs"), {
-          batch: selectedBatch,
-          date: attendanceDate,
-          uploadedBy: profile?.name || "Trainer",
-          status: isLate ? "Late Submission" : "On-Time",
-          presentCount: present,
-          absentCount: absent,
-          createdAt: now.toISOString()
-        });
-
-        await addDoc(collection(db, "file_logs"), {
-          name: file.name,
-          type: "Attendance",
-          status: isLate ? "Partial" : "Success",
-          uploader: profile?.name || "Trainer",
-          records: recordsCount,
-          batch: selectedBatch,
-          timestamp: now.toISOString()
-        });
-        
-        if (isLate) {
-          await triggerSystemAlert({
-            title: "Late Attendance Submission",
-            description: `Trainer ${profile?.name || "Trainer"} submitted attendance for ${selectedBatch} after the ${cutoffTime} cutoff.`,
-            severity: "Medium"
-          });
-        }
-        
-        setStats({ 
-          present, 
-          absent, 
-          rate: (present + absent) > 0 ? Math.round((present / (present + absent)) * 100) : 0 
-        });
-        setIsSaving(false);
-        showToast(isLate ? "Attendance Saved (Warning: Past Cutoff!)" : "Attendance Recorded Successfully!");
-      } catch (err) {
-        showToast("Error saving attendance", 'error');
-        setIsSaving(false);
+      if (parsed.length > 0) {
+        setParsedAttendance(parsed);
+        setShowPreviewModal(true);
+      } else {
+        showToast("No valid records found in CSV", "error");
       }
     };
-    if (isCSV) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsArrayBuffer(file);
+    reader.readAsText(file);
+    e.target.value = ""; // Reset input
+  };
+
+  const handleBulkAttendance = async () => {
+    setIsBulkSaving(true);
+    showToast("Processing bulk attendance...", "success");
+
+    const present = parsedAttendance.filter(s => s.status === 'PRESENT').length;
+    const absent = parsedAttendance.length - present;
+
+    try {
+      const now = new Date();
+      // Fetch Real Cutoff from Settings
+      const settingsSnap = await getDoc(doc(db, "settings", "governance"));
+      const settings = settingsSnap.exists() ? settingsSnap.data() : { attendanceCutoff: "10:00" };
+      const [cutoffHour, cutoffMin] = settings.attendanceCutoff.split(":").map(Number);
+      const isLate = now.getHours() > cutoffHour || (now.getHours() === cutoffHour && now.getMinutes() > cutoffMin);
+
+      // 1. LOG THE ATTENDANCE SESSION
+      await addDoc(collection(db, "attendance_logs"), {
+        batch: selectedBatch,
+        date: attendanceDate,
+        uploadedBy: profile?.name || "Trainer",
+        status: isLate ? "Late Submission" : "On-Time",
+        presentCount: present,
+        absentCount: absent,
+        createdAt: now.toISOString()
+      });
+
+      // 2. UPDATE INDIVIDUAL CANDIDATE STATS
+      let updatedCount = 0;
+      for (const record of parsedAttendance) {
+        const q = query(collection(db, "candidates"), where("email", "==", record.email));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          const candDoc = snap.docs[0];
+          const data = candDoc.data();
+          const prevPresent = data.presentSessions || 0;
+          const prevTotal = data.totalSessions || 0;
+          
+          const newPresent = record.status === 'PRESENT' ? prevPresent + 1 : prevPresent;
+          const newTotal = prevTotal + 1;
+          const newPercentage = Math.round((newPresent / newTotal) * 100);
+          
+          // Dynamic Risk Calculation based on Settings
+          const riskThreshold = settings.attendanceRiskThreshold || 75;
+          let newRisk = "LOW";
+          if (newPercentage < (riskThreshold - 15)) newRisk = "HIGH";
+          else if (newPercentage < riskThreshold) newRisk = "MEDIUM";
+
+          await updateDoc(doc(db, "candidates", candDoc.id), {
+            presentSessions: newPresent,
+            totalSessions: newTotal,
+            attendance: newPercentage,
+            risk: newRisk,
+            status: newPercentage < 60 ? "AT RISK" : "ACTIVE"
+          });
+          updatedCount++;
+        }
+      }
+
+      if (isLate) {
+        await triggerSystemAlert({
+          title: "Late Attendance Submission",
+          description: `Trainer ${profile?.name || "Trainer"} submitted bulk attendance for ${selectedBatch} after the ${cutoffTime} cutoff.`,
+          severity: "Medium"
+        });
+      }
+
+      showToast(`Batch saved! Updated ${updatedCount} out of ${parsedAttendance.length} students.`);
+      setShowPreviewModal(false);
+      setParsedAttendance([]);
+    } catch (err) {
+      console.error(err);
+      showToast("Error processing bulk data", "error");
+    } finally {
+      setIsBulkSaving(false);
     }
   };
 
@@ -242,33 +267,64 @@ export default function AttendancePage() {
 
   const handleFinalizeAttendance = async () => {
     setIsSaving(true);
-    const present = manualStudents.filter(s => s.present).length;
-    const absent = manualStudents.length - present;
+    const presentCount = manualStudents.filter(s => s.present).length;
+    const absentCount = manualStudents.length - presentCount;
 
     try {
+      // 1. LOG THE ATTENDANCE SESSION
       await addDoc(collection(db, "attendance_logs"), {
         batch: selectedBatch,
         date: attendanceDate,
         uploadedBy: profile?.name || "Trainer",
-        presentCount: present,
-        absentCount: absent,
+        presentCount: presentCount,
+        absentCount: absentCount,
         mode: "Manual",
         createdAt: new Date().toISOString()
       });
 
+      // 2. UPDATE INDIVIDUAL CANDIDATE STATS
+      const updatePromises = manualStudents.map(async (student) => {
+        const candRef = doc(db, "candidates", student.id);
+        const candSnap = await getDoc(candRef);
+        
+        if (candSnap.exists()) {
+          const data = candSnap.data();
+          const prevPresent = data.presentSessions || 0;
+          const prevTotal = data.totalSessions || 0;
+          
+          const newPresent = student.present ? prevPresent + 1 : prevPresent;
+          const newTotal = prevTotal + 1;
+          const newPercentage = Math.round((newPresent / newTotal) * 100);
+          
+          let newRisk = "LOW";
+          if (newPercentage < 60) newRisk = "HIGH";
+          else if (newPercentage < 75) newRisk = "MEDIUM";
+
+          await updateDoc(candRef, {
+            presentSessions: newPresent,
+            totalSessions: newTotal,
+            attendance: newPercentage,
+            risk: newRisk,
+            status: newPercentage < 60 ? "AT RISK" : "ACTIVE"
+          });
+        }
+      });
+      await Promise.all(updatePromises);
+
       // TRIGGER SYSTEM ALERT: High Absenteeism
-      if (absent > 5) {
+      if (absentCount > 5) {
         await triggerSystemAlert({
           title: "Critical Absenteeism Spike",
-          description: `${absent} students marked absent in Batch ${selectedBatch} for ${attendanceDate}.`,
+          description: `${absentCount} students marked absent in Batch ${selectedBatch} for ${attendanceDate}.`,
           severity: "Critical"
         });
       }
 
-      setStats({ present, absent, rate: Math.round((present/manualStudents.length)*100) });
+      setStats({ present: presentCount, absent: absentCount, rate: Math.round((presentCount/manualStudents.length)*100) });
       setShowManualModal(false);
-      showToast("Attendance finalized successfully!");
+      showToast("Attendance finalized & stats updated!");
     } catch (error) {
+      console.error(error);
       showToast("Error saving attendance", 'error');
     }
     setIsSaving(false);
@@ -370,6 +426,91 @@ export default function AttendancePage() {
                   className="px-6 py-2.5 rounded-xl text-sm font-bold text-zinc-400 border border-white/[0.08] hover:bg-white/[0.02] transition-all">
                   Manual Entry
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Preview Modal */}
+        {showPreviewModal && (
+          <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setShowPreviewModal(false)} />
+            <div className="relative w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[85vh]">
+              <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Review Attendance CSV</h3>
+                  <p className="text-xs text-teal-400 font-medium mt-1">Batch: {selectedBatch} • {attendanceDate}</p>
+                </div>
+                <button onClick={() => setShowPreviewModal(false)} className="text-zinc-400 hover:text-white"><X size={24} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                      <th className="pb-3 px-2">Student Name</th>
+                      <th className="pb-3 px-2">Email</th>
+                      <th className="pb-3 px-2">Status</th>
+                      <th className="pb-3 px-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {parsedAttendance.map((s) => (
+                      <tr key={s.id} className="border-b border-white/[0.03] group hover:bg-white/[0.02]">
+                        <td className="py-4 px-2 text-white font-medium">{s.name}</td>
+                        <td className="py-4 px-2 text-zinc-400">{s.email}</td>
+                        <td className="py-4 px-2">
+                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                            s.status === 'PRESENT' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                          }`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="py-4 px-2 text-right">
+                          <button 
+                            onClick={() => setParsedAttendance(prev => prev.filter(p => p.id !== s.id))}
+                            className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                          >
+                            <X size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="p-8 bg-[#0c0c0e] border-t border-white/5 flex items-center justify-between">
+                <div className="flex gap-6">
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                    Present: <span className="text-emerald-400">{parsedAttendance.filter(s=>s.status==='PRESENT').length}</span>
+                  </div>
+                  <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                    Absent: <span className="text-rose-400">{parsedAttendance.filter(s=>s.status==='ABSENT').length}</span>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowPreviewModal(false)}
+                    className="px-6 py-3 rounded-xl border border-white/10 text-xs font-bold text-zinc-400 uppercase tracking-widest hover:bg-white/5 transition-all"
+                  >
+                    Discard
+                  </button>
+                  <button 
+                    onClick={handleBulkAttendance}
+                    disabled={isBulkSaving}
+                    className="px-8 py-3.5 rounded-xl bg-teal-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-teal-500 transition-all shadow-xl shadow-black/20 flex items-center gap-2"
+                  >
+                    {isBulkSaving ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>Finalize Bulk Attendance</>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -16,6 +16,7 @@ export default function AnalyticsPage() {
   const [liveBatches, setLiveBatches] = useState<any[]>([]);
   const [aiSettings, setAiSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [aiInsight, setAiInsight] = useState("Analyzing batch performance data...");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,8 +30,36 @@ export default function AnalyticsPage() {
         setLiveBatches(batches);
 
         const settingsSnap = await getDoc(doc(db, "settings", "governance"));
-        if (settingsSnap.exists()) {
-          setAiSettings(settingsSnap.data());
+        const settings = settingsSnap.exists() ? settingsSnap.data() : { aiPersona: "Analytical" };
+        setAiSettings(settings);
+
+        // Calculate Stats for AI
+        const total = cands.length;
+        if (total > 0) {
+          const avgScore = Math.round(cands.reduce((s, c) => s + (c.avgScore || 0), 0) / total);
+          const highRisk = cands.filter(c => (c.risk === "HIGH" || (c.avgScore < 60 && c.avgScore > 0))).length;
+          const placementRate = Math.round((cands.filter(c => c.status === "OFFERED").length / total) * 100);
+
+          const aiRes = await fetch("/api/ai/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: [{
+                role: "user",
+                content: `As a ${settings.aiPersona} Talent Auditor, provide a 2-sentence analytical summary of this batch:
+                - Avg Score: ${avgScore}%
+                - Risk Rate: ${Math.round((highRisk/total)*100)}%
+                - Placement Velocity: ${placementRate}%
+                Focus on the correlation between scores and risk. Keep it professional.`
+              }],
+              userRole: "Trainer",
+              currentPath: "/analytics"
+            })
+          });
+          const aiData = await aiRes.json();
+          setAiInsight(aiData.content);
+        } else {
+          setAiInsight("Awaiting system initialization to provide insights.");
         }
       } catch (e) { console.error(e); }
       setLoading(false);
@@ -52,20 +81,6 @@ export default function AnalyticsPage() {
     { name: "High Risk", value: highRisk },
     { name: "Discontinued", value: liveCands.filter(c => c.status === "DISCONTINUED").length },
   ].filter(d => d.value > 0);
-
-  // Dynamic AI Insight based on Persona Setting
-  const getAIInsight = () => {
-    const persona = aiSettings?.aiPersona || "Analytical";
-    if (total === 0) return "Awaiting system initialization to provide insights.";
-
-    if (persona === "Strict") {
-      return `[STRICT MODE]: Placement rate is currently at ${placementRate}%. ${highRisk} candidates are failing to meet the 60% threshold. Immediate intervention required for Batch ${liveBatches[0]?.name || 'Alpha'}.`;
-    }
-    if (persona === "Supportive") {
-      return `Great progress! ${offered} talents have secured roles. While ${highRisk} students are currently struggling, targeted mentoring sessions this week could help bridge the gap. Keep going!`;
-    }
-    return `Analysis reveals a global average score of ${avgScore}%. Placement velocity is stable at ${placementRate}%. Data suggests a correlation between attendance and score variance in the current cycle.`;
-  };
 
   // Simulated Trend Data based on real Candidate count
   const trendData = [
@@ -101,7 +116,7 @@ export default function AnalyticsPage() {
             <div>
               <p className="text-[10px] font-bold text-teal-400 uppercase tracking-[0.2em] mb-1">AI Executive Summary ({aiSettings?.aiPersona || "Analytical"})</p>
               <p className="text-sm font-medium text-zinc-300 leading-relaxed max-w-3xl">
-                "{getAIInsight()}"
+                "{aiInsight.replace(/\*\*/g, '')}"
               </p>
             </div>
           </div>
