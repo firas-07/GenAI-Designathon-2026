@@ -241,7 +241,7 @@ export default function CandidatesPage() {
       });
 
       showToast(`${candidate.name} marked as discontinued.`);
-      setSelectedCandidate(prev => prev ? { ...prev, status: "DISCONTINUED" } : null);
+      setSelectedCandidate((prev: any) => prev ? { ...prev, status: "DISCONTINUED" } : null);
       setIsSaving(false);
     } catch (error) {
       console.error("Discontinue Error:", error);

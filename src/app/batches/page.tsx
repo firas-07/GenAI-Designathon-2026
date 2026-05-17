@@ -200,20 +200,53 @@ export default function BatchesPage() {
 
   const handleTriggerFeedback = async (batchId: string, batchName: string) => {
     try {
-      const { updateDoc, doc } = await import("firebase/firestore");
+      const { updateDoc, doc, collection, query, where, getDocs } = await import("firebase/firestore");
+      
+      // 1. Update Batch feedback status
       await updateDoc(doc(db, "batches", batchId), {
         feedbackStatus: "Active",
         feedbackTriggeredAt: new Date().toISOString()
       });
+
+      // 2. Fetch candidates registered in this batch
+      const q = query(collection(db, "candidates"), where("batch", "==", batchName));
+      const snap = await getDocs(q);
       
+      console.log(`[Feedback Dispatch] Found ${snap.size} candidates in batch ${batchName} to email.`);
+
+      // 3. Loop and send actual emails to each candidate
+      let successCount = 0;
+      const emailPromises = snap.docs.map(async (candidateDoc) => {
+        const c = candidateDoc.data();
+        const emailAddress = c.email || "designathon-student@maverick.com"; // safe fallback
+        try {
+          const res = await fetch("/api/email/send-student", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              toEmail: emailAddress,
+              recipientName: c.name || "Student",
+              subject: `Feedback Survey: ${batchName} Cohort`,
+              messageBody: `Please take 2 minutes to provide feedback on your training module in ${batchName}. Your response will help us maintain our rigorous training excellence.\n\nClick the link below to complete the evaluation:\n${window.location.origin}/feedback`,
+              type: "feedback"
+            })
+          });
+          if (res.ok) successCount++;
+        } catch (mailErr) {
+          console.error(`Failed to send feedback email to ${emailAddress}:`, mailErr);
+        }
+      });
+      await Promise.all(emailPromises);
+
+      // 4. Log to Governance activity ledger
       await logActivity({
         action: "Communication",
         category: "Governance",
-        details: `[FEEDBACK TRIGGERED] Survey launched for ${batchName}. Students notified via automated email channel.`,
+        details: `[FEEDBACK TRIGGERED] Survey launched for ${batchName}. Dispatched actual email surveys to ${successCount}/${snap.size} students via feedback channel (service_3ypywql).`,
         user: profile?.name || "Coordinator"
       });
       
-      showToast(`Feedback collection started for ${batchName}!`);
+      showToast(`Feedback collection started! Surveys dispatched to ${successCount} candidates.`);
     } catch (err) {
       console.error("Feedback error:", err);
       showToast("Failed to initiate feedback", "error");
@@ -255,7 +288,7 @@ export default function BatchesPage() {
       });
 
       showToast(`Batch ${batchName} graduated successfully!`);
-      setSelectedBatch(prev => prev ? { ...prev, status: "Completed" } : null);
+      setSelectedBatch((prev: any) => prev ? { ...prev, status: "Completed" } : null);
       setIsSaving(false);
     } catch (error) {
       console.error("Error graduating batch:", error);

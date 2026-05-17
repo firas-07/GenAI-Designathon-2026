@@ -155,6 +155,24 @@ export default function Dashboard() {
               type: "merit",
               timestamp: new Date().toISOString()
             });
+
+            // Auto-trigger accolades email to student topper
+            try {
+              await fetch('/api/email/send-student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  toEmail: topper.email || 'designathon-student@maverick.com',
+                  recipientName: topper.name || 'Student',
+                  subject: `✨ Maverick Academic Accolade: Batch Topper! ✨`,
+                  messageBody: `Congratulations! Maverick AI has recognized you as the Batch Topper in cohort ${topper.batch} with a stellar score of ${topper.avgScore}%! Keep up the brilliant work!`,
+                  type: 'outreach'
+                })
+              });
+              console.log(`[AutoSentry] Dispatched topper accolades email to ${topper.name}`);
+            } catch (err) {
+              console.error("[AutoSentry] Topper email trigger error:", err);
+            }
           }
         }
 
@@ -173,6 +191,24 @@ export default function Dashboard() {
               type: "risk",
               timestamp: new Date().toISOString()
             });
+
+            // Auto-trigger warning email to student
+            try {
+              await fetch('/api/email/send-student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  toEmail: rc.email || 'designathon-student@maverick.com',
+                  recipientName: rc.name || 'Student',
+                  subject: `⚠️ Maverick Academic Outreach: Performance Warning`,
+                  messageBody: `Dear ${rc.name}, our AI Sentry system has flagged your candidate profile in batch ${rc.batch} as high-risk due to performance or attendance threshold breaches. Please connect with your training coordinator immediately to schedule a review.`,
+                  type: 'outreach'
+                })
+              });
+              console.log(`[AutoSentry] Dispatched risk warning email to ${rc.name}`);
+            } catch (err) {
+              console.error("[AutoSentry] Risk warning email trigger error:", err);
+            }
           }
         }
       } catch (err) { console.error("AutoSentry Error:", err); }

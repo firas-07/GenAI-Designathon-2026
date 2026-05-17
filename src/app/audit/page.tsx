@@ -5,7 +5,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
 import { 
   Shield, Clock, User, Layers, CheckCircle2, 
-  AlertCircle, FileSpreadsheet, Brain, Zap, Search, Filter 
+  AlertCircle, FileSpreadsheet, Brain, Zap, Search, Filter, Mail
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,13 @@ export default function AuditLogPage() {
 
     const updateLogs = () => {
       const merged = [...fileLogs, ...auditLogs, ...systemAlerts].sort((a, b) => {
-        const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
-        const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+        const getT = (val: any) => {
+          if (!val) return 0;
+          if (typeof val.toDate === 'function') return val.toDate().getTime();
+          return new Date(val).getTime() || 0;
+        };
+        const timeA = getT(a.timestamp || a.createdAt);
+        const timeB = getT(b.timestamp || b.createdAt);
         return timeB - timeA;
       });
       setLogs(merged.slice(0, 40));
@@ -46,13 +51,17 @@ export default function AuditLogPage() {
     }, () => setLoading(false));
 
     const unsubAudit = onSnapshot(qAudit, (snap) => {
-      auditLogs = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        category: d.data().category || 'Governance',
-        icon: Shield,
-        accent: "indigo"
-      }));
+      auditLogs = snap.docs.map(d => {
+        const data = d.data();
+        const isComm = data.category === "Communication";
+        return {
+          id: d.id,
+          ...data,
+          category: data.category || 'Governance',
+          icon: isComm ? Mail : Shield,
+          accent: isComm ? "blue" : "indigo"
+        };
+      });
       updateLogs();
     }, () => setLoading(false));
 
@@ -150,7 +159,7 @@ export default function AuditLogPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold text-white mb-0.5">
-                            {new Date(log.timestamp || log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            {new Date(typeof (log.timestamp || log.createdAt)?.toDate === 'function' ? (log.timestamp || log.createdAt).toDate() : (log.timestamp || log.createdAt || 0)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                           </p>
                           <p className="text-[9px] font-mono text-zinc-500 truncate uppercase">ID: {log.id.slice(0, 12)}</p>
                         </div>
@@ -232,7 +241,7 @@ export default function AuditLogPage() {
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">System Timestamp</label>
                   <p className="text-base font-bold text-white flex items-center justify-end gap-2">
                     <Clock size={14} className="text-teal-500" />
-                    {new Date(selectedLog.timestamp || selectedLog.createdAt).toLocaleString()}
+                    {new Date(typeof (selectedLog.timestamp || selectedLog.createdAt)?.toDate === 'function' ? (selectedLog.timestamp || selectedLog.createdAt).toDate() : (selectedLog.timestamp || selectedLog.createdAt || 0)).toLocaleString()}
                   </p>
                 </div>
               </div>

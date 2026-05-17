@@ -103,11 +103,12 @@ export default function SystemSettings() {
         }
       }
       
-      await logActivity(
-        "Compliance",
-        `Manual compliance audit executed. Found ${missedCount} batches with missing attendance logs.`,
-        profile?.name || "Admin"
-      );
+      await logActivity({
+        action: "Compliance",
+        category: "Governance",
+        details: `Manual compliance audit executed. Found ${missedCount} batches with missing attendance logs.`,
+        user: profile?.name || "Admin"
+      });
       
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
@@ -199,6 +200,7 @@ export default function SystemSettings() {
   const tabs = [
     { id: "training", label: "Training Rules", icon: Database },
     { id: "governance", label: "Data Management", icon: ShieldCheck, adminOnly: true },
+    { id: "email", label: "Email Integrations", icon: Mail },
     { id: "ai", label: "AI & Insights", icon: Cpu },
     { id: "security", label: "Security", icon: Shield },
     { id: "notifications", label: "Notifications", icon: Bell },
@@ -536,6 +538,204 @@ export default function SystemSettings() {
                       >
                         <div className={cn("w-4 h-4 rounded-full bg-white transition-all shadow-sm", riskAlerts ? "translate-x-6" : "translate-x-0")} />
                       </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              {activeTab === "email" && 
+                <div className="relative z-10 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">Email Services & Integrations</h3>
+                    <p className="text-sm text-zinc-500 max-w-xl">Monitor your connected EmailJS service channels, dynamic template bindings, and send test communications.</p>
+                  </div>
+                  
+                  {/* Service Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">Primary Channel</span>
+                          <span className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            ACTIVE
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-white mb-1">Student Survey Service</h4>
+                          <p className="text-xs text-zinc-500">Dispatches automated cohort surveys, candidate feedback sheets, and compliance links.</p>
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Service ID:</span>
+                            <span className="font-mono text-zinc-300">service_3ypywql</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Template ID:</span>
+                            <span className="font-mono text-zinc-300">template_ra1vuvn</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Provider:</span>
+                            <span className="text-zinc-300">Google Mail (Gmail API)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 text-blue-400">Outreach Channel</span>
+                          <span className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            ACTIVE
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="text-base font-bold text-white mb-1">Academic Outreach & Alerts</h4>
+                          <p className="text-xs text-zinc-500">Dispatches automated high-risk performance warnings and Batch Topper accolades.</p>
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Service ID:</span>
+                            <span className="font-mono text-zinc-300">service_glwx52o</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Template ID:</span>
+                            <span className="font-mono text-zinc-300">template_ra1vuvn</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-zinc-500">Provider:</span>
+                            <span className="text-zinc-300">Google Mail (Gmail API)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Diagnostic Test Dispatcher */}
+                  <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-600/20">
+                        <RefreshCw size={18} className="text-blue-400 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-white">Diagnostic Integration Test</h4>
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Verify Live Outbound Dispatch</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Target Candidate Email</label>
+                          <input 
+                            type="email" 
+                            placeholder="e.g. your-email@gmail.com"
+                            id="test-target-email"
+                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all focus:border-blue-500/50"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Select Delivery Channel</label>
+                          <select 
+                            id="test-target-channel"
+                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all focus:border-blue-500/50"
+                          >
+                            <option value="feedback">Student Feedback Channel (service_3ypywql)</option>
+                            <option value="outreach">Academic Outreach Channel (service_glwx52o)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Dynamic Message Payload</label>
+                          <textarea 
+                            rows={3}
+                            placeholder="Type a sample message body here..."
+                            id="test-target-message"
+                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all focus:border-blue-500/50 resize-none"
+                          />
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            const emailInput = document.getElementById('test-target-email') as HTMLInputElement;
+                            const channelSelect = document.getElementById('test-target-channel') as HTMLSelectElement;
+                            const messageInput = document.getElementById('test-target-message') as HTMLTextAreaElement;
+                            
+                            if (!emailInput || !emailInput.value) {
+                              alert("Please enter a target email!");
+                              return;
+                            }
+                            
+                            const btn = document.getElementById('test-send-btn') as HTMLButtonElement;
+                            const originalText = btn.innerText;
+                            btn.innerText = "Dispatching...";
+                            btn.disabled = true;
+                            
+                            try {
+                              const res = await fetch('/api/email/send-student', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  toEmail: emailInput.value,
+                                  recipientName: "Maverick Tester",
+                                  subject: channelSelect.value === 'feedback' 
+                                    ? "📝 Diagnostic Verification: Student Survey Link"
+                                    : "✨ Diagnostic Verification: Academic Outreach Accolade",
+                                  messageBody: messageInput.value || "This is a secure automated diagnostic test of your Maverick Execution Platform integration.",
+                                  type: channelSelect.value
+                                })
+                              });
+                              
+                              if (res.ok) {
+                                alert("Success! Check your EmailJS dashboard 'Email History' tab and your inbox (including Spam/Promotions)!");
+                              } else {
+                                const data = await res.json();
+                                alert("Failed to dispatch: " + (data.error || "Unknown error"));
+                              }
+                            } catch (err: any) {
+                              alert("API Dispatch Error: " + err.message);
+                            } finally {
+                              btn.innerText = originalText;
+                              btn.disabled = false;
+                            }
+                          }}
+                          id="test-send-btn"
+                          className="w-full bg-teal-500 hover:bg-teal-400 text-[#060D1E] font-black uppercase tracking-wider py-3.5 rounded-xl text-xs transition-all shadow-md shadow-teal-900/10 flex items-center justify-center gap-2"
+                        >
+                          Send Diagnostic Email
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Template Variable Binding Table */}
+                  <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] space-y-4">
+                    <h4 className="text-sm font-semibold text-white">Dynamic Template Variable Mappings</h4>
+                    <p className="text-xs text-zinc-500">Verify these matching keys are present in your EmailJS template (`template_ra1vuvn`):</p>
+                    <div className="divide-y divide-white/5">
+                      <div className="py-2.5 flex justify-between text-xs">
+                        <span className="font-mono text-teal-400 font-bold">{ "{{subject}}" }</span>
+                        <span className="text-zinc-400">Dynamically generated email subject line</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between text-xs">
+                        <span className="font-mono text-teal-400 font-bold">{ "{{to_email}}" }</span>
+                        <span className="text-zinc-400">Target recipient email address</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between text-xs">
+                        <span className="font-mono text-teal-400 font-bold">{ "{{recipientName}}" }</span>
+                        <span className="text-zinc-400">First & Last name of the candidate</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between text-xs">
+                        <span className="font-mono text-teal-400 font-bold">{ "{{messageBody}}" }</span>
+                        <span className="text-zinc-400">Dynamic AI alert body / customized feedback card</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between text-xs">
+                        <span className="font-mono text-teal-400 font-bold">{ "{{reply_to}}" }</span>
+                        <span className="text-zinc-400">Set to support@maverick.com</span>
+                      </div>
                     </div>
                   </div>
                 </div>

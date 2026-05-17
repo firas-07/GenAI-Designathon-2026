@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, addDoc, where, updateDoc, doc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, getDoc, query, orderBy, addDoc, where, updateDoc, doc, onSnapshot } from "firebase/firestore";
 import Header from "@/components/Header";
 import { Upload, Trophy, TrendingUp, Loader2 } from "lucide-react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from "recharts";
