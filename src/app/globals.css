@@ -137,6 +137,190 @@ html, body {
   border-radius: 12px 4px 12px 12px;
 }
 
+/* ─── AI Markdown Body ─── */
+.ai-markdown-body {
+  line-height: 1.65;
+  word-break: break-word;
+}
+.ai-markdown-body .ai-p {
+  margin: 0 0 0.45em;
+}
+.ai-markdown-body .ai-p:last-child {
+  margin-bottom: 0;
+}
+.ai-markdown-body .ai-h1 {
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0.8em 0 0.4em;
+  letter-spacing: -0.01em;
+}
+.ai-markdown-body .ai-h2 {
+  font-size: 1.05em;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0.7em 0 0.35em;
+  letter-spacing: -0.01em;
+}
+.ai-markdown-body .ai-h3 {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin: 0.6em 0 0.3em;
+}
+.ai-markdown-body .ai-h4 {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #94a3b8;
+  margin: 0.5em 0 0.25em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ai-markdown-body .ai-bold {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+.ai-markdown-body .ai-italic {
+  color: #94a3b8;
+  font-style: italic;
+}
+.ai-markdown-body .ai-link {
+  color: #60a5fa;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+.ai-markdown-body .ai-link:hover {
+  color: #93bbfd;
+}
+.ai-markdown-body .ai-list {
+  margin: 0.4em 0 0.6em;
+  padding-left: 1.3em;
+  list-style: disc;
+}
+.ai-markdown-body .ai-list.ai-ol {
+  list-style: decimal;
+}
+.ai-markdown-body .ai-list li {
+  margin: 0.2em 0;
+  color: #d1d5db;
+  line-height: 1.55;
+}
+.ai-markdown-body .ai-list li::marker {
+  color: #60a5fa;
+}
+.ai-markdown-body .ai-hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0.6em 0;
+}
+.ai-markdown-body .ai-blockquote {
+  border-left: 3px solid #3b82f6;
+  margin: 0.5em 0;
+  padding: 0.3em 0.75em;
+  color: #94a3b8;
+  font-style: italic;
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: 0 6px 6px 0;
+}
+.ai-markdown-body .ai-code-block {
+  background: #0a0f1c;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 0.65em 0.85em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  font-size: 0.82em;
+  line-height: 1.5;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+  color: #93c5fd;
+}
+.ai-markdown-body .ai-inline-code {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+  font-family: 'Fira Code', 'JetBrains Mono', 'Cascadia Code', monospace;
+  color: #93c5fd;
+}
+.ai-markdown-body .ai-table-wrap {
+  overflow-x: auto;
+  margin: 0.5em 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ai-markdown-body .ai-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82em;
+}
+.ai-markdown-body .ai-table th {
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.45em 0.65em;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  text-transform: uppercase;
+  font-size: 0.9em;
+  letter-spacing: 0.04em;
+}
+.ai-markdown-body .ai-table td {
+  padding: 0.4em 0.65em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: #d1d5db;
+}
+.ai-markdown-body .ai-table tr:last-child td {
+  border-bottom: none;
+}
+.ai-markdown-body .ai-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ─── AI Recommendation Bubbles ─── */
+.ai-recommendations-wrap {
+  animation: fadeInRecs 0.35s ease-out both;
+  margin-top: 0.25rem;
+}
+@keyframes fadeInRecs {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ai-rec-bubble {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.ai-rec-bubble:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+.ai-rec-bubble:active {
+  transform: translateY(0);
+  background: rgba(59, 130, 246, 0.25);
+}
+
 /* ─── Progress bar ─── */
 .progress-bar {
   height: 3px;
@@ -179,3 +363,21 @@ html, body {
 .slide-in-from-bottom-4{ animation-name: slideInFromBottom; }
 .duration-300 { animation-duration: 0.3s; }
 .duration-500 { animation-duration: 0.5s; }
+
+/* ─── Prevent page flicker on load ─── */
+@keyframes fadeInPage {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-transition {
+  animation: fadeInPage 0.2s ease-in;
+}
+
+/* Prevent layout shift */
+html {
+  overflow-y: scroll;
+}
+
+body {
+  min-height: 100vh;
+}

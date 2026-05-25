@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
   // Shared
-  { href: "/",                 label: "Dashboard",            icon: LayoutDashboard, roles: ["Admin", "Training Coordinator", "Trainer"] },
+  { href: "/dashboard",        label: "Dashboard",            icon: LayoutDashboard, roles: ["Admin", "Training Coordinator", "Trainer"] },
   
   // Admin specific
   { href: "/users",            label: "User Management",      icon: Users,           roles: ["Admin"] },
@@ -28,7 +28,6 @@ const navItems = [
   { href: "/candidates",       label: "Candidates",           icon: Users,           roles: ["Training Coordinator"] },
   { href: "/attendance",       label: "Attendance Monitor",   icon: ClipboardCheck,  roles: ["Training Coordinator"] },
   { href: "/assessments",      label: "Assessments",          icon: BookOpen,        roles: ["Training Coordinator"] },
-  { href: "/feedback",         label: "Feedback",             icon: MessageSquare,   roles: ["Training Coordinator"] },
   { href: "/reports",          label: "Reports",              icon: FileDown,        roles: ["Training Coordinator"] },
   { href: "/alerts",           label: "Alerts",               icon: Bell,            roles: ["Training Coordinator"] },
 

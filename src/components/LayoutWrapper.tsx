@@ -15,15 +15,17 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const { user, profile, loading } = useAuth();
 
   const isLoginPage = pathname === "/login";
+  const isLandingPage = pathname === "/";
 
   // Route protection mapping
   const routePermissions: Record<string, string[]> = {
+    "/dashboard": ["Admin", "Training Coordinator", "Trainer"],
     "/users": ["Admin"],
     "/settings": ["Admin"],
     "/audit": ["Admin"],
     "/reports": ["Admin", "Training Coordinator"],
-    "/analytics": ["Admin", "Trainer"], // Training Coordinator doesn't have analytics in Sidebar
-    "/feedback": ["Admin", "Training Coordinator"],
+    "/analytics": ["Admin", "Trainer"],
+    "/feedback": ["Admin"],
     "/candidates": ["Admin", "Training Coordinator"],
     "/batches": ["Admin", "Training Coordinator", "Trainer"],
     "/attendance": ["Admin", "Training Coordinator", "Trainer"],
@@ -33,8 +35,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) {
-      router.push("/login");
+    // Don't redirect from landing page - let the page itself handle logged-in users
+    if (!loading && !user && !isLoginPage && !isLandingPage) {
+      router.push("/");
     }
 
     // Role-based route guard
@@ -42,10 +45,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (!loading && profile && routePermissions[cleanPath]) {
       if (!routePermissions[cleanPath].includes(profile.role)) {
         console.warn(`[Guard] Unauthorized access attempt to ${cleanPath} by ${profile.role}`);
-        router.push("/"); // Redirect to dashboard if unauthorized
+        router.push("/dashboard"); // Redirect to dashboard if unauthorized
       }
     }
-  }, [user, loading, isLoginPage, router, pathname, profile]);
+  }, [user, loading, isLoginPage, isLandingPage, router, pathname, profile]);
 
   if (loading) {
     return (
@@ -81,7 +84,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  if (isLoginPage) {
+  if (isLoginPage || isLandingPage) {
     return <main className="min-h-screen" style={{ background: "#040914" }}>{children}</main>;
   }
 

@@ -1,365 +1,371 @@
 "use client";
-import Header from "@/components/Header";
 import { useState, useEffect } from "react";
-import {
-  Users, Layers, AlertTriangle, ArrowUpRight, CheckCircle, ShieldAlert
-} from "lucide-react";
-import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer
-} from "recharts";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, query, limit, orderBy, onSnapshot, getDocs, getDoc, doc, setDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { 
+  Layers, Users, TrendingUp, Shield, CheckCircle, 
+  BarChart3, Bell, FileText, X, Mail, Lock, Eye, EyeOff, AlertCircle 
+} from "lucide-react";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
-const MetricCard = ({
-  label, value, icon: Icon, color, trendVal, trendColor
-}: { label: string; value: string | number; icon: React.ElementType; color: string; trendVal: string; trendColor: string }) => (
-  <div className="rounded-[16px] p-6 relative overflow-hidden flex flex-col justify-between h-[140px]" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
-    <div className="flex items-start justify-between">
-      <div className="w-12 h-12 rounded-[12px] flex items-center justify-center shadow-lg"
-        style={{ background: color }}>
-        <Icon size={24} className="text-white" />
-      </div>
-      <div className="text-right">
-        <p className="text-[13px] font-medium text-[#82A0CE] mb-1">{label}</p>
-        <p className="text-[28px] font-bold text-white leading-none">{value}</p>
-      </div>
-    </div>
-    
-    <div className="flex items-center gap-1.5 mt-auto">
-      <ArrowUpRight size={14} style={{ color: trendColor }} />
-      <span className="text-[12px] font-semibold" style={{ color: trendColor }}>{trendVal}</span>
-      <span className="text-[12px] text-[#5271A3]">vs last month</span>
-    </div>
+export default function LandingPage() {
+  const { user, profile, loading } = useAuth();
+  const router = useRouter();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-    <div className="absolute right-0 bottom-6 w-24 h-8 opacity-60">
-      <svg viewBox="0 0 100 30" className="w-full h-full" preserveAspectRatio="none">
-        <path d="M0,20 Q10,25 20,15 T40,10 T60,20 T80,5 T100,10" fill="none" stroke={trendColor} strokeWidth="2" />
-      </svg>
-    </div>
-  </div>
-);
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="p-3 rounded-lg text-sm shadow-xl border border-white/10" style={{ background: "#0B1221" }}>
-      <p className="font-semibold text-white mb-2">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color || "#3B82F6" }}>{p.name}: {p.value}</p>
-      ))}
-    </div>
-  );
-};
-
-export default function Dashboard() {
-  const { profile } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalUsers: "0",
-    activeBatches: "0",
-    totalCandidates: "0",
-    alerts: "0"
-  });
-  const [performanceData, setPerformanceData] = useState<any[]>([]);
-  const [batchData, setBatchData] = useState<any[]>([]);
-  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
-
+  // Redirect to dashboard if already logged in
   useEffect(() => {
-    setLoading(true);
+    if (!loading && user && profile && !isRedirecting) {
+      setIsRedirecting(true);
+      router.push("/dashboard");
+    }
+  }, [user, profile, loading, router, isRedirecting]);
 
-    // 1. Live Stats & Performance
-    const unsubCands = onSnapshot(collection(db, "candidates"), (snap) => {
-      const allCands = snap.docs.map(d => d.data());
-      setStats(prev => ({ ...prev, totalCandidates: snap.size.toLocaleString() }));
-      
-      const perfData = [
-        { name: '40-50%', value: allCands.filter(d => (d.avgScore || 0) < 50).length },
-        { name: '50-60%', value: allCands.filter(d => (d.avgScore || 0) >= 50 && (d.avgScore || 0) < 60).length },
-        { name: '60-70%', value: allCands.filter(d => (d.avgScore || 0) >= 60 && (d.avgScore || 0) < 70).length },
-        { name: '70-80%', value: allCands.filter(d => (d.avgScore || 0) >= 70 && (d.avgScore || 0) < 80).length },
-        { name: '80-90%', value: allCands.filter(d => (d.avgScore || 0) >= 80 && (d.avgScore || 0) < 90).length },
-        { name: '90-100%', value: allCands.filter(d => (d.avgScore || 0) >= 90).length },
-      ];
-      setPerformanceData(perfData);
-    });
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      setShowLoginModal(false);
+    } catch (err: any) {
+      let msg = err.message;
+      if (err.code === "auth/invalid-credential") msg = "Invalid email or password.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const unsubBatches = onSnapshot(collection(db, "batches"), (snap) => {
-      const active = snap.docs.filter(d => d.data().status === "Running").length;
-      setStats(prev => ({ ...prev, activeBatches: active.toString() }));
-      
-      const batchComparison = snap.docs.slice(0, 5).map(doc => {
-        const data = doc.data();
-        return {
-          name: data.name?.split('-')[1] || data.name || "Batch",
-          value: data.enrolled || 0,
-          display: (data.enrolled || 0).toString()
-        };
-      });
-      setBatchData(batchComparison);
-    });
+  const handleGoogleLogin = async () => {
+    setSubmitting(true);
+    setError("");
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      setShowLoginModal(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const unsubAlerts = onSnapshot(collection(db, "system_alerts"), (snap) => {
-      const allAlerts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Sort in memory to handle different field names (timestamp vs createdAt)
-      const sorted = allAlerts.sort((a: any, b: any) => {
-        const timeA = a.timestamp?.seconds ? a.timestamp.seconds * 1000 : new Date(a.timestamp || a.createdAt || 0).getTime();
-        const timeB = b.timestamp?.seconds ? b.timestamp.seconds * 1000 : new Date(b.timestamp || b.createdAt || 0).getTime();
-        return timeB - timeA;
-      }).slice(0, 5);
+  if (loading || isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#040914" }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3B82F6] to-[#1E3A8A] flex items-center justify-center animate-pulse">
+            <Layers size={24} className="text-white" />
+          </div>
+          <div className="text-[#82A0CE] text-sm">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
-      const mapped = sorted.map((data: any) => {
-        const severity = (data.severity || "medium").toLowerCase();
-        const isHigh = severity === "critical" || severity === "high";
-        
-        return {
-          title: data.title || "System Alert",
-          desc: data.message || data.description || "No description available.",
-          status: severity.toUpperCase(),
-          time: data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
-          icon: isHigh ? ShieldAlert : AlertTriangle,
-          color: isHigh ? "#EF4444" : (severity === "medium" ? "#F59E0B" : "#3B82F6")
-        };
-      });
-      setRecentAlerts(mapped);
-      setStats(prev => ({ ...prev, alerts: snap.size.toString() }));
-      setLoading(false);
-    });
-
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      setStats(prev => ({ ...prev, totalUsers: snap.size.toLocaleString() }));
-    });
-
-    // 2. PROACTIVE AI SCANNER (Auto-triggers Alerts)
-    const runAutoSentry = async () => {
-      try {
-        const candsSnap = await getDocs(query(collection(db, "candidates")));
-        const cands = candsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        
-        if (cands.length === 0) return;
-
-        // A. Identify Topper
-        const topper = [...cands].sort((a,b) => (b.avgScore || 0) - (a.avgScore || 0))[0];
-        if (topper && topper.avgScore >= 90) {
-          const alertId = `topper-${topper.id}-${new Date().toLocaleDateString().replace(/\//g, '-')}`;
-          const alertRef = doc(db, "system_alerts", alertId);
-          const alertSnap = await getDoc(alertRef);
-          
-          if (!alertSnap.exists()) {
-            await setDoc(alertRef, {
-              title: "AI Merit Recognition",
-              message: `Maverick AI has identified ${topper.name} as the Batch Topper with a stellar score of ${topper.avgScore}%!`,
-              severity: "low",
-              type: "merit",
-              timestamp: new Date().toISOString()
-            });
-
-            // Auto-trigger accolades email to student topper
-            try {
-              await fetch('/api/email/send-student', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  toEmail: topper.email || 'designathon-student@maverick.com',
-                  recipientName: topper.name || 'Student',
-                  subject: `✨ Maverick Academic Accolade: Batch Topper! ✨`,
-                  messageBody: `Congratulations! Maverick AI has recognized you as the Batch Topper in cohort ${topper.batch} with a stellar score of ${topper.avgScore}%! Keep up the brilliant work!`,
-                  type: 'outreach'
-                })
-              });
-              console.log(`[AutoSentry] Dispatched topper accolades email to ${topper.name}`);
-            } catch (err) {
-              console.error("[AutoSentry] Topper email trigger error:", err);
-            }
-          }
-        }
-
-        // B. Identify High Risk (Auto-trigger)
-        const highRiskCands = cands.filter(c => c.risk === "HIGH");
-        for (const rc of highRiskCands) {
-          const alertId = `risk-${rc.id}-${new Date().toLocaleDateString().replace(/\//g, '-')}`;
-          const alertRef = doc(db, "system_alerts", alertId);
-          const alertSnap = await getDoc(alertRef);
-
-          if (!alertSnap.exists()) {
-            await setDoc(alertRef, {
-              title: "Urgent Governance Alert",
-              message: `AI Detection: ${rc.name} in ${rc.batch} has breached risk thresholds. Immediate intervention required.`,
-              severity: "high",
-              type: "risk",
-              timestamp: new Date().toISOString()
-            });
-
-            // Auto-trigger warning email to student
-            try {
-              await fetch('/api/email/send-student', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  toEmail: rc.email || 'designathon-student@maverick.com',
-                  recipientName: rc.name || 'Student',
-                  subject: `⚠️ Maverick Academic Outreach: Performance Warning`,
-                  messageBody: `Dear ${rc.name}, our AI Sentry system has flagged your candidate profile in batch ${rc.batch} as high-risk due to performance or attendance threshold breaches. Please connect with your training coordinator immediately to schedule a review.`,
-                  type: 'outreach'
-                })
-              });
-              console.log(`[AutoSentry] Dispatched risk warning email to ${rc.name}`);
-            } catch (err) {
-              console.error("[AutoSentry] Risk warning email trigger error:", err);
-            }
-          }
-        }
-      } catch (err) { console.error("AutoSentry Error:", err); }
-    };
-
-    runAutoSentry();
-
-    return () => {
-      unsubCands();
-      unsubBatches();
-      unsubAlerts();
-      unsubUsers();
-    };
-  }, []);
+  // Don't render landing page if user is logged in (prevents flash)
+  if (user && profile) {
+    return null;
+  }
 
   return (
-    <div className="flex-1 flex flex-col" style={{ background: "#060D1E" }}>
-      <Header title="Mavericks Execution Platform" />
-      
-      <div className="p-6 space-y-6 fade-in max-w-[1600px] mx-auto w-full">
+    <div className="min-h-screen w-full overflow-x-hidden page-transition" style={{ background: "#040914" }}>
+      {/* Background Effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#020510] via-[#040A18] to-[#0A122E]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#2563EB] opacity-20 blur-[150px] rounded-full mix-blend-screen" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#3B82F6] opacity-15 blur-[120px] rounded-full mix-blend-screen" />
+        <div 
+          className="absolute inset-0 opacity-10" 
+          style={{ backgroundImage: 'radial-gradient(circle at center, #82A0CE 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+        />
+      </div>
 
-        {/* 4 Metric Cards Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <MetricCard label="Total Users" value={stats.totalUsers} icon={Users} color="#2563EB" trendVal="12.5%" trendColor="#3B82F6" />
-          <MetricCard label="Active Batches" value={stats.activeBatches} icon={Layers} color="#10B981" trendVal="5.9%" trendColor="#10B981" />
-          <MetricCard label="Total Candidates" value={stats.totalCandidates} icon={Users} color="#8B5CF6" trendVal="8.7%" trendColor="#8B5CF6" />
-          <MetricCard label="Alerts" value={stats.alerts} icon={AlertTriangle} color="#F59E0B" trendVal="16.7%" trendColor="#F59E0B" />
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Line Chart */}
-          <div className="rounded-[16px] p-6" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[15px] font-semibold text-white">Performance Trends</h2>
-              <select className="bg-[#0B1221] border border-white/10 text-[#82A0CE] text-xs rounded-lg px-3 py-1.5 outline-none cursor-pointer">
-                <option>Last 7 Days</option>
-              </select>
+      {/* Main Content */}
+      <div className="relative z-10">
+        {/* Header */}
+        <header className="w-full px-6 py-6 flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#3B82F6] to-[#1E3A8A] flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Layers size={22} className="text-white" />
             </div>
-            <div className="h-[250px] w-full">
-              {loading ? (
-                <div className="h-full flex items-center justify-center text-zinc-500 text-sm italic">Analyzing trends...</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: "#82A0CE", fontSize: 11 }} axisLine={false} tickLine={false} dy={10} />
-                      <YAxis tick={{ fill: "#82A0CE", fontSize: 11 }} axisLine={false} tickLine={false} dx={-10} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
-                      <Bar dataKey="value" name="Candidates" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <div className="flex justify-center items-center gap-2 mt-4">
-              <div className="w-2.5 h-2.5 rounded-sm bg-[#3B82F6]" />
-              <span className="text-[11px] text-[#82A0CE]">Candidate Score Distribution</span>
+            <div>
+              <h2 className="text-[17px] font-bold text-white tracking-wider leading-tight">MAVERICKS</h2>
+              <p className="text-[9px] text-[#60A5FA] tracking-[0.2em] font-semibold uppercase">Execution Platform</p>
             </div>
           </div>
+          
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 active:scale-95"
+            style={{ 
+              background: "linear-gradient(to right, #2563EB, #3B82F6)",
+              boxShadow: "0 8px 20px -6px rgba(59, 130, 246, 0.5)"
+            }}
+          >
+            Login
+          </button>
+        </header>
 
-          {/* Bar Chart */}
-          <div className="rounded-[16px] p-6" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[15px] font-semibold text-white">Batch Comparison</h2>
-              <select className="bg-[#0B1221] border border-white/10 text-[#82A0CE] text-xs rounded-lg px-3 py-1.5 outline-none cursor-pointer">
-                <option>This Month</option>
-              </select>
+        {/* Hero Section */}
+        <section className="max-w-7xl mx-auto px-6 py-20 lg:py-32">
+          <div className="text-center max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 border border-blue-500/20" style={{ background: "rgba(59, 130, 246, 0.1)" }}>
+              <Shield size={16} className="text-[#60A5FA]" />
+              <span className="text-sm text-[#82A0CE] font-medium">Trusted Training Management System</span>
             </div>
-            <div className="h-[250px] w-full relative">
-              {loading ? (
-                <div className="h-full flex items-center justify-center text-zinc-500 text-sm italic">Loading metrics...</div>
-              ) : (
-                <>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={batchData} margin={{ top: 20, right: 20, left: 0, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: "#82A0CE", fontSize: 11 }} axisLine={false} tickLine={false} dy={10} />
-                      <YAxis tick={{ fill: "#82A0CE", fontSize: 11 }} axisLine={false} tickLine={false} dx={-10} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
-                      <Bar dataKey="value" name="Total Candidates" fill="#2563EB" radius={[4, 4, 0, 0]} barSize={40}>
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  {/* Custom Labels on top of bars */}
-                  <div className="absolute inset-0 pointer-events-none flex items-end pb-8">
-                    {batchData.map((d, i) => (
-                      <div key={i} className="flex-1 flex justify-center pb-2">
-                        <span className="text-[11px] font-bold text-white relative z-10" 
-                          style={{ transform: `translateY(-${Math.min((d.value / Math.max(...batchData.map(v => v.value || 1))) * 190, 190)}px)` }}>
-                          {d.display}
-                        </span>
-                      </div>
-                    ))}
+
+            <h1 className="text-5xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-6">
+              Transform Your <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#60A5FA] via-[#3B82F6] to-[#6366F1]">
+                Training Operations
+              </span>
+            </h1>
+
+            <p className="text-[#82A0CE] text-lg lg:text-xl max-w-2xl mx-auto leading-relaxed mb-10">
+              Centralize batch management, automate attendance tracking, and drive data-driven decisions with real-time analytics and AI-powered insights.
+            </p>
+
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="px-8 py-4 rounded-xl text-base font-bold text-white transition-all hover:scale-105 active:scale-95 inline-flex items-center gap-2"
+              style={{ 
+                background: "linear-gradient(to right, #2563EB, #3B82F6)",
+                boxShadow: "0 12px 24px -8px rgba(59, 130, 246, 0.6)"
+              }}
+            >
+              Get Started
+              <TrendingUp size={20} />
+            </button>
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section className="max-w-7xl mx-auto px-6 py-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Users,
+                title: "Candidate Management",
+                description: "Streamline onboarding, batch assignments, and track candidate progress throughout the training lifecycle.",
+                color: "#3B82F6"
+              },
+              {
+                icon: BarChart3,
+                title: "Real-Time Analytics",
+                description: "Access comprehensive dashboards with performance metrics, attendance trends, and assessment insights.",
+                color: "#10B981"
+              },
+              {
+                icon: Bell,
+                title: "Smart Alerts",
+                description: "Automated notifications for attendance cutoffs, risk thresholds, and critical training milestones.",
+                color: "#F59E0B"
+              },
+              {
+                icon: FileText,
+                title: "Assessment Tracking",
+                description: "Upload and manage Sprint, API, Coding, and Project scores with Excel-based bulk operations.",
+                color: "#8B5CF6"
+              },
+              {
+                icon: Shield,
+                title: "Role-Based Access",
+                description: "Secure RBAC system ensuring trainers, coordinators, and admins have appropriate permissions.",
+                color: "#EF4444"
+              },
+              {
+                icon: CheckCircle,
+                title: "Automated Workflows",
+                description: "Replace manual spreadsheets with system-driven execution and operational discipline.",
+                color: "#06B6D4"
+              }
+            ].map((feature, idx) => {
+              const Icon = feature.icon;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-2xl p-6 transition-all hover:scale-105 cursor-pointer group"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(11, 18, 33, 0.6) 0%, rgba(4, 9, 20, 0.8) 100%)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+                  }}
+                >
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"
+                    style={{ background: `${feature.color}15`, border: `1px solid ${feature.color}30` }}
+                  >
+                    <Icon size={26} style={{ color: feature.color }} />
                   </div>
-                </>
-              )}
-            </div>
-            <div className="flex justify-center items-center gap-2 mt-4">
-              <div className="w-2.5 h-2.5 rounded-sm bg-[#2563EB]" />
-              <span className="text-[11px] text-[#82A0CE]">Total Candidates</span>
-            </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
+                  <p className="text-[#82A0CE] text-sm leading-relaxed">{feature.description}</p>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </section>
 
-        {/* Recent Alerts List - Only show if data available */}
-        {recentAlerts.length > 0 && (
-          <div className="rounded-[16px] p-6" style={{ background: "rgba(11, 22, 50, 0.6)", border: "1px solid rgba(255,255,255,0.04)" }}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[15px] font-semibold text-white">Recent Alerts</h2>
-              <button className="text-[12px] font-medium text-[#3B82F6] hover:text-[#60A5FA] flex items-center gap-1 transition-colors">
-                View All Alerts &rarr;
+
+
+        {/* Footer */}
+        <footer className="border-t border-white/5 py-8">
+          <div className="max-w-7xl mx-auto px-6 text-center text-[#5271A3] text-sm">
+            <p>&copy; 2026 Mavericks Execution Platform. All rights reserved.</p>
+          </div>
+        </footer>
+      </div>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-md mx-4 rounded-2xl p-8 shadow-2xl"
+            style={{
+              background: "linear-gradient(145deg, rgba(11,18,33,0.97) 0%, rgba(4,9,20,0.99) 100%)",
+              border: "1px solid rgba(59, 130, 246, 0.2)",
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.6)"
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowLoginModal(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/5"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex flex-col items-center mb-8">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 relative" 
+                style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+                <Lock size={24} className="text-[#60A5FA]" />
+                <div className="absolute inset-0 bg-[#3B82F6] opacity-20 blur-[10px] rounded-full" />
+              </div>
+              <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
+              <p className="text-[14px] text-[#82A0CE]">Login to access your dashboard</p>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-[13px] font-medium text-white mb-2 ml-1">Email</label>
+                <div className="relative group">
+                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5271A3] group-focus-within:text-[#3B82F6] transition-colors" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl text-[14px] text-white outline-none transition-all"
+                    style={{
+                      background: "rgba(4, 9, 20, 0.6)",
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)"
+                    }}
+                    onFocus={e => {
+                      e.target.style.borderColor = "#60A5FA";
+                      e.target.style.background = "rgba(11, 18, 33, 0.8)";
+                      e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1), inset 0 2px 4px rgba(0,0,0,0.2)";
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = "rgba(59, 130, 246, 0.3)";
+                      e.target.style.background = "rgba(4, 9, 20, 0.6)";
+                      e.target.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.2)";
+                    }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[13px] font-medium text-white mb-2 ml-1">Password</label>
+                <div className="relative group">
+                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5271A3] group-focus-within:text-[#3B82F6] transition-colors" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full pl-11 pr-12 py-3.5 rounded-xl text-[14px] text-white outline-none transition-all"
+                    style={{
+                      background: "rgba(4, 9, 20, 0.6)",
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      boxShadow: "inset 0 2px 4px rgba(0,0,0,0.2)"
+                    }}
+                    onFocus={e => {
+                      e.target.style.borderColor = "#60A5FA";
+                      e.target.style.background = "rgba(11, 18, 33, 0.8)";
+                      e.target.style.boxShadow = "0 0 0 4px rgba(59, 130, 246, 0.1), inset 0 2px 4px rgba(0,0,0,0.2)";
+                    }}
+                    onBlur={e => {
+                      e.target.style.borderColor = "rgba(59, 130, 246, 0.3)";
+                      e.target.style.background = "rgba(4, 9, 20, 0.6)";
+                      e.target.style.boxShadow = "inset 0 2px 4px rgba(0,0,0,0.2)";
+                    }}
+                    required
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#5271A3] hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div
+                  className="flex items-start gap-2.5 p-3.5 rounded-xl text-[13px] font-medium"
+                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#FCA5A5" }}
+                >
+                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-4 rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-70 mt-4 relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98]"
+                style={{ 
+                  background: "linear-gradient(to right, #2563EB, #3B82F6)",
+                  boxShadow: "0 8px 20px -6px rgba(59, 130, 246, 0.5), inset 0 1px 1px rgba(255,255,255,0.2)"
+                }}
+              >
+                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+                {submitting ? "Logging in..." : "Login"}
+              </button>
+            </form>
+
+            <div className="mt-6 flex flex-col items-center gap-4">
+              <div className="flex items-center gap-2 w-full">
+                <div className="h-[1px] flex-1 bg-white/5" />
+                <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Or continue with</span>
+                <div className="h-[1px] flex-1 bg-white/5" />
+              </div>
+
+              <button 
+                onClick={handleGoogleLogin}
+                disabled={submitting}
+                className="w-full py-3.5 rounded-xl border border-white/10 hover:bg-white/[0.02] text-white text-sm font-semibold transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                Sign in with Google
               </button>
             </div>
-            
-            <div className="space-y-3">
-              {loading ? (
-                [1, 2, 3].map(i => (
-                  <div key={i} className="h-16 w-full animate-pulse rounded-xl bg-white/5" />
-                ))
-              ) : (
-                recentAlerts.map((alert, idx) => {
-                  const Icon = alert.icon;
-                  return (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl transition-colors hover:bg-white/[0.02]" style={{ border: "1px solid rgba(255,255,255,0.04)", background: "rgba(11, 18, 33, 0.4)" }}>
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${alert.color}15` }}>
-                        <Icon size={20} style={{ color: alert.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold text-white mb-0.5">{alert.title}</p>
-                        <p className="text-[12px] text-[#82A0CE]">{alert.desc}</p>
-                      </div>
-                      <div className="flex items-center gap-6 mt-2 sm:mt-0">
-                        <span className="px-3 py-1 rounded-full text-[11px] font-medium border" 
-                          style={{ 
-                            color: alert.color, 
-                            borderColor: `${alert.color}40`,
-                            background: `${alert.color}10`
-                          }}>
-                          {alert.status}
-                        </span>
-                        <span className="text-[12px] text-[#5271A3] w-16 text-right">{alert.time}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </div>
   );
 }

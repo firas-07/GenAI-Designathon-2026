@@ -554,9 +554,9 @@ export default function BatchesPage() {
         {/* Stats Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total", value: displayBatches.length, color: "#3B82F6" },
-            { label: "Running", value: displayBatches.filter(b => b.status === "Running").length, color: "#10b981" },
-            { label: "Completed", value: displayBatches.filter(b => ["Completed","Closed"].includes(b.status)).length, color: "#60A5FA" },
+            { label: "Total", value: filtered.length, color: "#3B82F6" },
+            { label: "Running", value: filtered.filter(b => b.status === "Running").length, color: "#10b981" },
+            { label: "Completed", value: filtered.filter(b => ["Completed","Closed"].includes(b.status)).length, color: "#60A5FA" },
           ].map(c => (
             <div key={c.label} className="glass-card p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"
