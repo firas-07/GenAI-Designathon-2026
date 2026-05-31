@@ -8,10 +8,13 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line
 } from "recharts";
 import { Brain, TrendingUp, Users, AlertTriangle, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { where } from "firebase/firestore";
 
 const COLORS = ["#3B82F6", "#10b981", "#f59e0b", "#ef4444", "#60A5FA"];
 
 export default function AnalyticsPage() {
+  const { profile } = useAuth();
   const [liveCands, setLiveCands] = useState<any[]>([]);
   const [liveBatches, setLiveBatches] = useState<any[]>([]);
   const [aiSettings, setAiSettings] = useState<any>(null);
@@ -21,12 +24,39 @@ export default function AnalyticsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // First, get trainer's batches if trainer role
+        let trainerBatchNames: Set<string> = new Set();
+        
+        if (profile?.role === "Trainer") {
+          const batchQuery = query(collection(db, "batches"), where("trainer", "==", profile.name));
+          const batchSnap = await getDocs(batchQuery);
+          batchSnap.docs.forEach(doc => {
+            trainerBatchNames.add(doc.data().name);
+          });
+          console.log(`[Analytics] Trainer ${profile.name} batches:`, Array.from(trainerBatchNames));
+        }
+
+        // Fetch all candidates
         const candSnap = await getDocs(query(collection(db, "candidates")));
-        const cands = candSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        let cands = candSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        
+        // Filter candidates for trainers
+        if (profile?.role === "Trainer") {
+          cands = cands.filter(c => trainerBatchNames.has(c.batch));
+          console.log(`[Analytics] Filtered to ${cands.length} candidates in trainer's batches`);
+        }
+        
         setLiveCands(cands);
 
+        // Fetch batches
         const batchSnap = await getDocs(query(collection(db, "batches")));
-        const batches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        let batches = batchSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        
+        // Filter batches for trainers
+        if (profile?.role === "Trainer") {
+          batches = batches.filter(b => b.trainer === profile.name);
+        }
+        
         setLiveBatches(batches);
 
         const settingsSnap = await getDoc(doc(db, "settings", "governance"));
@@ -64,8 +94,11 @@ export default function AnalyticsPage() {
       } catch (e) { console.error(e); }
       setLoading(false);
     };
-    fetchData();
-  }, []);
+    
+    if (profile) {
+      fetchData();
+    }
+  }, [profile]);
 
   // Real-time KPI Calculations
   const total = liveCands.length;
