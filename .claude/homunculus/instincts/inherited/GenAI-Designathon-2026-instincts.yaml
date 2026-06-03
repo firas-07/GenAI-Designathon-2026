@@ -1,0 +1,542 @@
+# Instincts generated from https://github.com/firas-07/GenAI-Designathon-2026
+# Generated: 2026-05-29T06:55:06.960Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: GenAI-Designathon-2026-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Commit Length
+
+## Action
+
+Write moderate-length commit messages (~88 characters)
+
+## Evidence
+
+- Average commit message length: 88 chars
+- Based on 15 commits
+
+---
+id: GenAI-Designathon-2026-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: GenAI-Designathon-2026-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: GenAI-Designathon-2026-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: GenAI-Designathon-2026-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: app, components, context, lib, types
+
+---
+id: GenAI-Designathon-2026-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: GenAI-Designathon-2026-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~16x per month
+- Files: /*, src/app/ai-assistant/*, src/app/alerts/*
+
+---
+id: GenAI-Designathon-2026-workflow-add-or-update-dashboard-module
+trigger: "when doing add or update dashboard module"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Workflow Add Or Update Dashboard Module
+
+## Action
+
+Follow the add-or-update-dashboard-module workflow:
+1. Create or update the module page in src/app/[module]/page.tsx
+2. If needed, add or update related API route in src/app/api/[module]/route.ts
+3. Update src/components/Sidebar.tsx and/or src/components/LayoutWrapper.tsx to reflect navigation changes
+4. Update global styles or context providers if necessary
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: src/app/[module]/page.tsx, src/app/api/[module]/route.ts, src/components/Sidebar.tsx
+
+---
+id: GenAI-Designathon-2026-workflow-feature-development-with-shared-ui
+trigger: "when doing feature development with shared ui"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Workflow Feature Development With Shared Ui
+
+## Action
+
+Follow the feature-development-with-shared-ui workflow:
+1. Update multiple src/app/[module]/page.tsx files to implement the feature
+2. Update shared components in src/components (e.g., Sidebar.tsx, LayoutWrapper.tsx, Header.tsx)
+3. Update context providers in src/context if needed
+4. Update global styles in src/app/globals.css if the feature has a UI impact
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/app/[module]/page.tsx, src/components/Sidebar.tsx, src/components/LayoutWrapper.tsx
+
+---
+id: GenAI-Designathon-2026-workflow-api-endpoint-creation-or-update
+trigger: "when doing api endpoint creation or update"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Workflow Api Endpoint Creation Or Update
+
+## Action
+
+Follow the api-endpoint-creation-or-update workflow:
+1. Create or update src/app/api/[endpoint]/route.ts
+2. Update related module UI in src/app/[module]/page.tsx
+3. Optionally update documentation or markdown files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/app/api/[endpoint]/route.ts, src/app/[module]/page.tsx, *.md
+
+---
+id: GenAI-Designathon-2026-workflow-shared-component-style-update
+trigger: "when doing shared component style update"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/firas-07/GenAI-Designathon-2026
+---
+
+# GenAI Designathon 2026 Workflow Shared Component Style Update
+
+## Action
+
+Follow the shared-component-style-update workflow:
+1. Update one or more files in src/components (Sidebar.tsx, Header.tsx, LayoutWrapper.tsx)
+2. Update global styles in src/app/globals.css
+3. Update layout in src/app/layout.tsx if needed
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/components/Sidebar.tsx, src/components/Header.tsx, src/components/LayoutWrapper.tsx
+
+---
+id: genai-designathon-2026-instinct-file-naming
+trigger: "When creating a new file in the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct File Naming
+
+## Action
+
+Name the file using camelCase convention
+
+## Evidence
+
+- Pattern in folder structure and namingConventions.files
+- Consistent with TypeScript codebase
+
+---
+id: genai-designathon-2026-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Function Naming
+
+## Action
+
+Name the function using camelCase convention
+
+## Evidence
+
+- Pattern in namingConventions.functions
+- TypeScript best practices
+
+---
+id: genai-designathon-2026-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase convention
+
+## Evidence
+
+- Pattern in namingConventions.classes
+
+---
+id: genai-designathon-2026-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE convention
+
+## Evidence
+
+- Pattern in namingConventions.constants
+
+---
+id: genai-designathon-2026-instinct-import-alias
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Import Alias
+
+## Action
+
+Use alias import style instead of relative paths
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: genai-designathon-2026-instinct-export-default
+trigger: "When exporting modules or components"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Export Default
+
+## Action
+
+Use default export style
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: genai-designathon-2026-instinct-try-catch-error-handling
+trigger: "When handling errors in code"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Try Catch Error Handling
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style
+
+---
+id: genai-designathon-2026-instinct-test-location
+trigger: "When adding tests for a module"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Test Location
+
+## Action
+
+Place test files in a separate directory from source code
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+
+---
+id: genai-designathon-2026-instinct-test-after-feature
+trigger: "When implementing a new feature"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Test After Feature
+
+## Action
+
+Add or update tests for the feature after implementation
+
+## Evidence
+
+- Commit sequence in feature-development workflow
+- Pattern in workflows
+
+---
+id: genai-designathon-2026-instinct-git-commit-prefix
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Git Commit Prefix
+
+## Action
+
+Prefix the message with 'feat' for features or 'chore' for maintenance tasks
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Examples: 'feat: implement...', 'chore: remove...'
+
+---
+id: genai-designathon-2026-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Git Commit Format
+
+## Action
+
+Use the format: <type>: <short description>
+
+## Evidence
+
+- Pattern in commits.examples
+- Commit: 'feat: implement authentication...'
+
+---
+id: genai-designathon-2026-instinct-add-or-update-dashboard-module
+trigger: "When introducing a new dashboard feature or updating an existing module"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Add Or Update Dashboard Module
+
+## Action
+
+Create or update src/app/[module]/page.tsx, update or add src/app/api/[module]/route.ts if needed, update src/components/Sidebar.tsx and/or src/components/LayoutWrapper.tsx, and update global styles or context providers if necessary
+
+## Evidence
+
+- Workflow: add-or-update-dashboard-module
+- Commit sequences and files involved
+
+---
+id: genai-designathon-2026-instinct-feature-development-with-shared-ui
+trigger: "When rolling out a new feature or improvement affecting several modules and shared components"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Feature Development With Shared Ui
+
+## Action
+
+Update multiple src/app/[module]/page.tsx files, shared components in src/components, context providers in src/context if needed, and global styles in src/app/globals.css if the feature has a UI impact
+
+## Evidence
+
+- Workflow: feature-development-with-shared-ui
+- Commit sequences and files involved
+
+---
+id: genai-designathon-2026-instinct-api-endpoint-creation-or-update
+trigger: "When exposing new backend functionality or updating an existing API for dashboard modules"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Api Endpoint Creation Or Update
+
+## Action
+
+Create or update src/app/api/[endpoint]/route.ts, update related module UI in src/app/[module]/page.tsx, and optionally update documentation or markdown files
+
+## Evidence
+
+- Workflow: api-endpoint-creation-or-update
+- Commit sequences and files involved
+
+---
+id: genai-designathon-2026-instinct-shared-component-style-update
+trigger: "When changing the look and feel or structure of shared UI elements"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: firas-07/GenAI-Designathon-2026
+---
+
+# Genai Designathon 2026 Instinct Shared Component Style Update
+
+## Action
+
+Update one or more files in src/components (Sidebar.tsx, Header.tsx, LayoutWrapper.tsx), update global styles in src/app/globals.css, and update layout in src/app/layout.tsx if needed
+
+## Evidence
+
+- Workflow: shared-component-style-update
+- Commit sequences and files involved
+
